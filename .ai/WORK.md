@@ -1,12 +1,9 @@
 Current focus:
 
-- Phase 1.1: limiter refinements from Ian's ratified decisions
-  (see .ai/plans/phase-1.1-limiter-refinements.md)
-- Real documentation (docs/USAGE.md; humans + other people's agents)
-
-In progress:
-
-- Phase 1.1 implementation + zero-context plan review
+- HANDOFF: fresh orchestrator session takes over — read
+  .ai/plans/2026-07-15-alpha-handoff.md first
+- Phase 1.1 is planned + amended, NOT reviewed or implemented (first
+  review attempt died to a session limit; rerun before implementing)
 
 Done:
 
@@ -25,5 +22,6 @@ Not in scope right now:
 Open questions:
 
 - Standalone publish order (Ian: no preference yet)
-- Warn-scope: warn on exemptFiles beyond defaults only, or custom
-  exemptDirs too? (Claude picked the former; Ian to confirm)
+- Rename `exemptDirs` → `archiveDirs` pre-publish? (taxonomy honesty;
+  see Phase 1.1 plan amendments)
+- Suspicious-ignore heuristic vs future janitor agent (see BACKLOG.md)

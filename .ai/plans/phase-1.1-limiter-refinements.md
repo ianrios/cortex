@@ -1,6 +1,24 @@
 # Phase 1.1 — Limiter Refinements (Ian's ratified decisions)
 
-Status: planned 2026-07-15. No code in this plan; intent only.
+Status: planned 2026-07-15; awaiting zero-context peer review (first
+attempt died to a session limit — RERUN IT before implementing).
+No code in this plan; intent only.
+
+## Amendments from Ian (2026-07-15, second round)
+
+- exemptFiles = true warn (confirmed as planned below).
+- Taxonomy: Ian thinks in THREE dir classes, not two — "ignored"
+  (node_modules/.vscode/.claude: not content), "archival" (.ai/completed:
+  content that exited via lifecycle), and notes .github is NOT always
+  ignorable (actions/templates are real content; default stays, must be
+  easily overridable). Consider renaming `exemptDirs` → `archiveDirs`
+  pre-publish for conceptual honesty; reviewer should weigh in.
+- Red-flag idea: warn when a custom ignoreDirs/exemptDirs entry nests
+  inside a source tree (e.g. `src/components/docs`) — suspicious
+  placement suggests budget-dodging. Heuristic candidate: warn on custom
+  entries that are not dot-dirs and not top-level. Reviewer: assess
+  feasibility/noise; Ian is unsure if this is too prescriptive vs
+  shipping a future "janitor agent" package that audits these instead.
 
 ## Problem
 

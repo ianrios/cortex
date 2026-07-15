@@ -76,6 +76,18 @@ Agents will eventually write skills/docs into ignored folders to dodge the
 checks. There must be a flag that scans the ENTIRE repo scope, ignoring
 the ignore/exempt lists, as an audit view.
 
+## Dir taxonomy (2026-07-15, round 2)
+
+Three classes, not two: **ignored** (node_modules, .vscode — not content),
+**archival** (.ai/completed — content that exited via lifecycle), and
+gray-zone dirs like .github (actions/templates are real content; ignoring
+it is a default, not a truth). An ignore entry nested in a source tree
+(`src/components/docs`) is a red flag. Ian's instinct: maybe don't build
+prescriptive heuristics — ship a **janitor agent** package that inspects
+ignored dirs and config intelligently instead. He self-checks
+prescriptiveness constantly ("or am I being too prescriptive?") — the
+deleted-framework lesson applied forward.
+
 ## Site/publishing posture
 
 No wheel reinvention: README + docs in the monorepo first, maybe a GitHub
