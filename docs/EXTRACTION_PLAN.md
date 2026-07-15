@@ -30,7 +30,7 @@ working parts into one installable, agent-agnostic system.
 | ---- | ------ | ----------- |
 | Context budgets (md count, doc/code line caps, archival lifecycle) | petal + portfolio `validate` scripts | Engine: context limiter package |
 | Drift-check harness (registry pattern, pure checks, IO shell) | portfolio `scripts/drift-checks.ts` + `validate.ts` | Engine: harness package; project checks stay userland |
-| Strict lint baseline (strictTypeChecked, no-disable, knip, prettier-first ordering) | petal + portfolio configs | Engine: shareable presets |
+| Strict lint baseline (strictTypeChecked, no-disable, knip; prettier-first ordering is portfolio practice) | petal + portfolio configs | Engine: shareable presets |
 | Agent workflow kit (plan/execute/peer-review prompts, approval semantics, anti-patterns log, retro loop) | clinical `prompts/` + portfolio `.ai/` | Patterns: vendored markdown |
 | `.ai/` directory convention (CONTEXT/WORK/RULES/ANTI-PATTERNS, plans → completed) | WRC + portfolio | Patterns: `cortex init` scaffold |
 | Agent governance (authority model, transitions, validation contract) | WRC `.ai/ops/` | Roadmap only — `docs/roadmap/agent-governance/`. Untested workflows are not extracted; preserved as the long-term direction. |
@@ -50,9 +50,10 @@ by how it changes:
   the other layers. Pointers, never copies: this is what keeps cortex
   agent-agnostic as models and tools change.
 
-Dogfooding before publish: consume via `pnpm` workspace locally and
-`npm i github:ianrios/cortex` from other repos. No publish cadence pressure
-until the config surface stabilizes.
+Dogfooding before publish: consume via `pnpm` workspace locally; from other
+repos use `pnpm pack` tarballs or Changesets snapshot releases (a plain
+`npm i github:...` cannot install a workspace subpackage or build `dist/`).
+No publish cadence pressure until the config surface stabilizes.
 
 ## Naming
 
@@ -74,19 +75,34 @@ considered: `headroom` (taken by a scroll library; softer metaphor),
 
 Runtime-vision docs archived to `docs/archive/`; WRC governance specs ported
 to `docs/roadmap/agent-governance/`; new README, this plan, ROADMAP,
-AGENTS.md/CLAUDE.md, `.ai/` skeleton; repo dogfoods its own budgets.
+AGENTS.md/CLAUDE.md, `.ai/` skeleton; budgets honored manually pending the
+Phase 1 checker.
 
 ### Phase 1 — Context limiter (flagship)
 
 Extract the structural half of the portfolio's `validate.ts` (md-count,
-doc-size, code-size, eslint-disable scan) into `packages/brickwall`:
+doc-size, code-size, and the eslint-disable scan — all four live in
+brickwall) into `packages/brickwall`:
 
-- Config file with budgets, tier overrides (story/spec dirs), exemption dirs
-  (archives), ignore dirs; sane defaults matching the portfolio's numbers.
-- Walker respects `.gitignore` (prefer `git ls-files` with fs fallback).
-- CLI (`brickwall` bin + `cortex check` alias later): exit 1 on violations,
-  grouped `[type] message` output, `--json` for tooling.
-- Pure check functions, unit tests over fixtures, ESM, Node >= 20.
+- Config semantics (peer-reviewed 2026-07-15): **ignoreDirs** are never
+  walked (defaults include `node_modules`, `.git`, `dist`, `.changeset`,
+  `.claude`, `.github`); **exemptDirs** are the archival escape valve,
+  walked but exempt from every check and count (petal semantics, not the
+  portfolio's count-only variant); **exemptFiles** (default `CHANGELOG.md`)
+  covers generated, monotonically-growing files; **storyDirs** get the
+  280-line tier. All defaults overridable, all visible in config.
+- `budgets.codeLines` accepts a number or per-extension map (the portfolio
+  needs `.scss: 600` at migration time — designed now, not retrofitted).
+- Walker: `git ls-files --cached --others --exclude-standard` (untracked
+  files must be seen) with fs fallback; posix-normalized paths so config
+  prefixes behave on Windows.
+- CLI (`brickwall` bin; a `cortex` umbrella bin is a Phase 3 decision):
+  exit 0 pass / 1 violations / 2 config-or-usage error; grouped
+  `[type] message` output; `--json` is the stable machine surface (exact-
+  asserted in tests; human output stays free to change).
+- Pure check functions, zero runtime dependencies (a trust feature —
+  decided), unit + fixture-repo integration tests, ESM, Node >= 20
+  (develop on 24).
 
 Deliberately first: highest-conviction idea, most generic, independently
 shareable even if nothing else ships.
@@ -95,22 +111,32 @@ shareable even if nothing else ships.
 
 Extract the registry/runner pattern (registry keys are the violation-type
 union; pure checks take parsed data, return message arrays; IO lives in the
-shell). Portfolio's 13 token checks stay in the portfolio as the first
-userland consumer — that migration proves the plugin API is real.
+shell). Not a lift-and-shift: the union trick works inside one compilation
+unit, so built-in types vs userland check keys vs `--json` schema need real
+API design (namespacing, collisions). Portfolio's 13 token checks stay in
+the portfolio as the first userland consumer — that migration proves the
+plugin API is real.
 
 ### Phase 3 — Repo baseline + scaffolder
 
 Shareable ESLint strictTypeChecked flat config, prettier/knip presets,
-husky/lint-staged wiring, and `cortex init`: vendors the `.ai/` skeleton and
-AGENTS.md/CLAUDE.md starters. Honors the copy-then-edit rule — templates are
-real files copied in, never regenerated from scratch.
+markdownlint config and coverage-floor guidance (petal's remaining gates),
+husky/lint-staged wiring, and `cortex init`: vendors the `.ai/` skeleton
+(CONTEXT/WORK/RULES/ANTI-PATTERNS/WORKFLOW/BUGS + plans/specs/completed)
+and AGENTS.md/CLAUDE.md starters. Honors the copy-then-edit rule —
+templates are real files copied in, never regenerated. Decide here whether
+an umbrella `cortex` bin owns `init`/`check`.
 
 ### Phase 4 — Agent workflow kit
 
-Genericize the clinical planning/execution/peer-review prompt templates and
-the portfolio's orchestration + approval semantics + anti-patterns model into
-the patterns layer. Ship the Claude Code plugin adapter (`/plan`, `/execute`,
-`/retro` commands loading vendored prompts; hook running the engine checks).
+Genericize into the patterns layer, naming sources precisely: clinical's
+planning/execution prompt templates AND its retro-first mechanics (retro
+written before the plan, before/after metrics table, "harden tooling" as a
+standing step — the most novel piece), plus the portfolio's `.ai/WORKFLOW.md`
+(orchestrator vs file-allowlisted subagents, fold rules, doc-update
+checklist) and approval semantics + anti-patterns model. Ship the Claude
+Code plugin adapter (`/plan`, `/execute`, `/retro` commands loading vendored
+prompts; hook running the engine checks).
 
 ### Phase 5 — Dogfood migration
 
@@ -122,8 +148,18 @@ the config surface is right. Then WRC and the other repos.
 
 Agent governance validators — see `docs/roadmap/agent-governance/README.md`.
 
-## Open decisions
+## Open decisions (Ian)
 
-- Ratify `brickwall` (Ian).
-- License: MIT placed as default; swap if desired.
-- Whether brickwall publishes standalone before the cortex umbrella does.
+- Ratify `brickwall`; license (MIT placed); standalone publish order.
+- Per-file code-size exemptions: the portfolio exempts its two data
+  manifests (`data.ts`, `adminData.ts`) via a config list. Allowed pattern
+  (visible config, not inline comments) or must the portfolio restructure?
+- Monorepo model: one root config for a whole workspace vs per-package
+  configs. Shapes petal's migration; decide before Phase 5.
+- Default ignore set ratification (`.claude`, `.github`, `.changeset`) and
+  `CHANGELOG.md` exemption.
+
+## Peer review record
+
+Founding docs reviewed by a zero-context agent on 2026-07-15; all blocking
+findings folded above. Condensed record: `.ai/completed/2026-07-15-plan-review.md`.

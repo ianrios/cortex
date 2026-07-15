@@ -39,5 +39,8 @@ sufficient — behavior gets verified by running the CLI against fixtures.
 
 Root and `.ai/` core docs: max 80 lines. `docs/**`, `.ai/plans/**`,
 `.ai/specs/**`: max 280. `docs/archive/**`, `docs/roadmap/agent-governance/**`,
-`.ai/completed/**`: exempt (imported/archived records). Finished plans are
-`git mv`'d to `.ai/completed/`, and their epic section folds to one line.
+`.ai/completed/**`: exempt from ALL checks and counts (archival escape
+valve); `.changeset/`, `.claude/`, `.github/` are never walked; CHANGELOGs
+exempt as generated files. Encoded in `brickwall.config.json` from Phase 1.
+Finished plans are `git mv`'d to `.ai/completed/`; their section folds to
+one line.

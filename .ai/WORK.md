@@ -17,7 +17,9 @@ Not in scope right now:
 - Agent governance validators (roadmap only)
 - Publishing to npm (dogfood via workspace / github: installs first)
 
-Open questions:
+Open questions (all Ian's — see plan's "Open decisions"):
 
-- Ratify `brickwall` as the context limiter name (Ian)
-- Config file format: standalone file vs package.json key vs both
+- Ratify `brickwall`; standalone publish order
+- Per-file code-size exemptions: allowed config pattern or banned?
+- Monorepo config model: root-wide vs per-package
+- Default ignore set + CHANGELOG exemption ratification

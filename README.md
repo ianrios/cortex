@@ -11,7 +11,7 @@ hand-wavy instructions.
 
 | Layer        | What                                                        | Ships as                    |
 | ------------ | ----------------------------------------------------------- | --------------------------- |
-| **Engine**   | Runnable, generic checks: context limiter, code-size caps, drift-check harness, lint presets | Versioned npm packages (`@ianrios/*`) |
+| **Engine**   | Runnable, generic checks: the context limiter (`brickwall`), drift-check harness, lint presets | Versioned npm packages (`@ianrios/*`) |
 | **Patterns** | Repo-owned content: `.ai/` convention, prompt templates, anti-patterns log | Vendored by `cortex init` (shadcn model — drift is expected) |
 | **Adapters** | Per-tool shims: Claude Code plugin, Codex config, git hooks  | Thin pointers to layers 1–2, never copies |
 
@@ -22,9 +22,11 @@ lint rules instead of fixing code, declare work done when checks pass, and
 forget every lesson between sessions. Each cortex tool closes one of those
 failure modes with a deterministic check or a written-down workflow.
 
-The flagship is the **context limiter** (proposed name: `brickwall`): a hard
-ceiling on markdown file count and file line lengths, paired with an archival
-lifecycle, so a repo's agent-loadable context stays bounded forever.
+The flagship is the **context limiter** (proposed name: `brickwall`): hard
+ceilings on markdown file count, doc and code line lengths, plus an
+`eslint-disable` scan — paired with an archival lifecycle (exemption happens
+by moving files through it, never by inline ignore comments) — so a repo's
+agent-loadable context stays bounded forever.
 
 ## Status
 
