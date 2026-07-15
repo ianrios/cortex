@@ -5,21 +5,21 @@ so agents never clip. Zero runtime dependencies. ESM-only. Node >= 20.
 
 ## What it checks
 
-- `md-count` — total `.md` files (excluding `exemptDirs`/`exemptFiles`) stays
-  under `budgets.mdFileCount`.
+- `md-count` — total `.md` files (excluding `archiveDirs`/`exemptFiles`)
+  stays under `budgets.mdFileCount`.
 - `doc-size` — each `.md` file stays under `budgets.mdLines`, or
   `budgets.storyLines` under a `storyDirs` prefix.
 - `code-size` — each code file (by `codeExtensions`, excluding `*.test.*` /
-  `*.spec.*`) stays under `budgets.codeLines`.
+  `*.spec.*` and `exemptFiles`) stays under `budgets.codeLines`.
 - `eslint-disable` — no `eslint-disable` comment in any code file (when
-  `banEslintDisable` is true).
+  `banEslintDisable` is true). Naive line regex: prose mentions flag too,
+  deliberately. `exemptFiles` does NOT escape this ban; `archiveDirs` do.
 
 ## Config
 
-Looked up, in order, at the current working directory: a
-`brickwall.config.json` file, or a `"brickwall"` key in `package.json`.
-Having both is a config error. No config file/key at all uses the defaults
-below.
+Looked up at the cwd: `brickwall.config.json` or a `"brickwall"` key in
+`package.json`. Both at once, or any unknown key, is a config error. No
+config at all uses the defaults below.
 
 ```jsonc
 {
@@ -27,54 +27,54 @@ below.
     "mdFileCount": 25,
     "mdLines": 80,
     "storyLines": 280,
-    // A plain number applies to every codeExtensions entry. A map sets a
-    // per-extension cap instead — every configured extension must have an
-    // entry.
+    // A number caps all extensions; a map must cover every configured one.
     "codeLines": 250 // or { ".ts": 250, ".scss": 600 }
   },
   "storyDirs": [".ai/plans", ".ai/specs", "docs"],
   // Excluded from ALL checks and the md-count — the archival escape valve.
-  "exemptDirs": [".ai/completed", "docs/archive"],
-  // Excluded from md-count and doc-size only (matched by basename or exact
-  // relative path). CHANGELOGs grow monotonically and are generated.
+  "archiveDirs": [".ai/completed", "docs/archive"],
+  // Excluded from md-count/doc-size/code-size, by basename or exact path.
+  // Custom entries WARN as exemption debt; these defaults stay silent.
   "exemptFiles": ["CHANGELOG.md"],
   // Never walked at all.
   "ignoreDirs": [
     "node_modules", ".git", "dist", "build", "coverage",
-    ".changeset", ".claude", ".github"
+    ".changeset", ".claude", ".github", ".vscode", ".codex", ".cursor"
   ],
   "codeExtensions": [".ts", ".tsx", ".js", ".jsx"],
   "banEslintDisable": true
 }
 ```
 
-Unknown keys (top-level or under `budgets`) are a config error.
-
 ## CLI
 
 ```bash
-brickwall            # human output; ✅/❌ to stderr
-brickwall --json     # machine-readable violations array to stdout
+brickwall            # human output; ✅/❌ verdict then ⚠ warnings, to stderr
+brickwall --json     # {"violations":[...],"warnings":[...]} to stdout
+brickwall --all      # full-scope audit (below)
 brickwall --config path/to/brickwall.config.json
 ```
 
-Exit codes: `0` no violations, `1` violations found (never used for a config
-problem), `2` config or usage error (bad config key, unreadable `--config`
-path, both config sources present, unknown flag). `--json` is the stable
-machine surface (an array of `{ type, message, file? }`); the human-readable
-format is free to change wording/layout.
+Exit codes: `0` no violations, `1` violations found, `2` config or usage
+error. Warnings NEVER affect the exit code. `--json` is the stable machine
+surface: `{ violations, warnings }` — violations `{ type, message, file? }`,
+warnings `{ type, message }` in config-entry order: `exemption-debt` (a
+custom `exemptFiles` entry shields ≥1 scanned file; every match enumerated)
+or `stale-exemption` (matches nothing).
 
-## eslint-disable matching is a naive line regex
+`--all` is an audit view for humans/agents, NOT a CI gate: an fs walk
+skipping ONLY `node_modules` and `.git`, with `ignoreDirs`/`archiveDirs`/
+`exemptFiles` disabled. Build output and test fixtures WILL fire.
 
-Matches the source scripts this was extracted from: `//.*eslint-disable` or
-`/\*.*eslint-disable.*\*/`. It does not parse comments or strings, so prose
-like `// eslint-disable is banned here` is flagged even though it isn't a
-real disable directive. Deliberate — matching known behavior, not a bug.
+## Changelog (pre-publish)
+
+- 2026-07-15 — BREAKING: `--json` output was a bare violations array, now
+  `{ violations, warnings }`; `exemptDirs` renamed `archiveDirs`. Added
+  `--all`, the warnings channel, default ignores `.vscode`/`.codex`/`.cursor`.
 
 ## Programmatic use
 
 ```ts
 import { run } from '@ianrios/brickwall';
-
-const { violations, config } = run({ cwd: process.cwd() });
+const { violations, warnings, config } = run({ cwd: process.cwd() });
 ```

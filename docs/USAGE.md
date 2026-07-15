@@ -8,8 +8,9 @@ touches the network, reads only your working tree, and exits 0/1/2
 ## Standalone (the normal case)
 
 ```bash
-npx brickwall            # human output
-npx brickwall --json     # stable machine output
+npx brickwall            # human output (verdict, then ⚠ warnings)
+npx brickwall --json     # stable machine output: { violations, warnings }
+npx brickwall --all      # full-scope audit — NOT a CI gate (see below)
 npx brickwall --config path/to/brickwall.config.json
 ```
 
@@ -44,11 +45,20 @@ NOT expected to adopt that chain — compose your own.
 
 The numbers only work with the archival flow they were designed around:
 
-- Finished plans/specs move (`git mv`) into an exempt dir
-  (`.ai/completed/`, `docs/archive/`) — they leave the budget by moving
-  through a lifecycle, never via an inline ignore comment.
+- Finished plans/specs move (`git mv`) into an archive dir
+  (`archiveDirs`: `.ai/completed/`, `docs/archive/`) — they leave the
+  budget by moving through a lifecycle, never via an inline ignore
+  comment.
 - Epics fold completed phases to a single line pointing at the archive.
 - One fact lives in one file; docs state non-obvious constraints only.
+- Per-file exemptions (`exemptFiles`) are allowed everywhere but custom
+  entries print a warning — visible exemption debt, never an exit-code
+  change. A stale entry (matching nothing) warns too: remove it.
+- `--all` is the superadmin audit: an fs walk skipping only
+  `node_modules` and `.git`, with `ignoreDirs`, `archiveDirs`, and
+  `exemptFiles` disabled. Gitignored files, build output, and test
+  fixtures WILL show up — that is the point. Use it to review what the
+  normal run is shielding; do not wire it into CI.
 
 ## For agents installing this for a human
 

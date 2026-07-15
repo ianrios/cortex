@@ -1,6 +1,6 @@
 {
   "storyDirs": ["docs", ".ai/plans", ".ai/specs"],
-  "exemptDirs": [
+  "archiveDirs": [
     ".ai/completed",
     "docs/archive",
     "docs/roadmap/agent-governance"

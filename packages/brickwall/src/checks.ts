@@ -9,6 +9,14 @@ export interface Violation {
   file?: string;
 }
 
+export type WarningType = 'exemption-debt' | 'stale-exemption';
+
+/** Mirrors Violation. Warnings NEVER affect the exit code. */
+export interface Warning {
+  type: WarningType;
+  message: string;
+}
+
 export interface FileContent {
   path: string;
   content: string;
@@ -30,8 +38,8 @@ function hasPrefix(file: string, dirs: string[]): boolean {
   });
 }
 
-export function isExempt(file: string, exemptDirs: string[]): boolean {
-  return hasPrefix(file, exemptDirs);
+export function isExempt(file: string, archiveDirs: string[]): boolean {
+  return hasPrefix(file, archiveDirs);
 }
 
 /** Matches by exact relative path OR basename (e.g. "CHANGELOG.md" matches any depth). */
@@ -70,12 +78,12 @@ export function resolveCodeLimit(file: string, codeLines: CodeLinesBudget): numb
 
 export function checkMdCount(
   mdFiles: string[],
-  exemptDirs: string[],
+  archiveDirs: string[],
   exemptFiles: string[],
   limit: number,
 ): Violation[] {
   const active = mdFiles.filter(
-    (f) => !isExempt(f, exemptDirs) && !isExemptFile(f, exemptFiles),
+    (f) => !isExempt(f, archiveDirs) && !isExemptFile(f, exemptFiles),
   );
   if (active.length > limit) {
     return [
@@ -91,13 +99,13 @@ export function checkMdCount(
 export function checkDocSize(
   files: FileContent[],
   storyDirs: string[],
-  exemptDirs: string[],
+  archiveDirs: string[],
   exemptFiles: string[],
   budgets: { mdLines: number; storyLines: number },
 ): Violation[] {
   const violations: Violation[] = [];
   for (const { path, content } of files) {
-    if (isExempt(path, exemptDirs) || isExemptFile(path, exemptFiles)) continue;
+    if (isExempt(path, archiveDirs) || isExemptFile(path, exemptFiles)) continue;
     const tier = resolveDocTier(path, storyDirs);
     const max = tier === 'story' ? budgets.storyLines : budgets.mdLines;
     const lines = countLines(content);
@@ -114,12 +122,13 @@ export function checkDocSize(
 
 export function checkCodeSize(
   files: FileContent[],
-  exemptDirs: string[],
+  archiveDirs: string[],
+  exemptFiles: string[],
   codeLines: CodeLinesBudget,
 ): Violation[] {
   const violations: Violation[] = [];
   for (const { path, content } of files) {
-    if (isExempt(path, exemptDirs)) continue;
+    if (isExempt(path, archiveDirs) || isExemptFile(path, exemptFiles)) continue;
     if (isTestFile(path)) continue;
     const max = resolveCodeLimit(path, codeLines);
     const lines = countLines(content);
@@ -134,6 +143,40 @@ export function checkCodeSize(
   return violations;
 }
 
+/**
+ * Audits custom exemptFiles entries against the scanned set (the md and code
+ * files the checks see — test files excluded, archiveDirs removed). Each
+ * custom entry yields exactly one warning, in config-entry order: an
+ * `exemption-debt` warning enumerating EVERY matched file (basename matching
+ * means one entry can shield many), or `stale-exemption` when it matches
+ * nothing. Default entries (e.g. CHANGELOG.md) are always silent.
+ */
+export function checkExemptionDebt(
+  scannedFiles: string[],
+  exemptFiles: string[],
+  defaultExemptFiles: string[],
+): Warning[] {
+  const warnings: Warning[] = [];
+  for (const entry of exemptFiles) {
+    if (defaultExemptFiles.includes(entry)) continue;
+    const matched = scannedFiles.filter((f) => isExemptFile(f, [entry]));
+    if (matched.length > 0) {
+      warnings.push({
+        type: 'exemption-debt',
+        message:
+          `exemptFiles "${entry}" exempts ${matched.length} file(s): ` +
+          matched.join(', '),
+      });
+    } else {
+      warnings.push({
+        type: 'stale-exemption',
+        message: `exemptFiles "${entry}" matches no scanned file`,
+      });
+    }
+  }
+  return warnings;
+}
+
 // Matches the ESLint disable-comment pragma inside `//` line comments or
 // `/* ... */` block comments. Deliberately a naive line-regex (matching the
 // source scripts this was extracted from): it flags prose mentions of the
@@ -142,11 +185,11 @@ const ESLINT_DISABLE_RE = /\/\/.*(eslint-disable)|(\/\*.*eslint-disable.*\*\/)/;
 
 export function checkEslintDisable(
   files: FileContent[],
-  exemptDirs: string[],
+  archiveDirs: string[],
 ): Violation[] {
   const violations: Violation[] = [];
   for (const { path, content } of files) {
-    if (isExempt(path, exemptDirs)) continue;
+    if (isExempt(path, archiveDirs)) continue;
     content.split('\n').forEach((line, i) => {
       if (ESLINT_DISABLE_RE.test(line)) {
         violations.push({

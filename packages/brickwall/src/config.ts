@@ -22,7 +22,7 @@ export interface BrickwallBudgets {
 export interface BrickwallConfig {
   budgets: BrickwallBudgets;
   storyDirs: string[];
-  exemptDirs: string[];
+  archiveDirs: string[];
   exemptFiles: string[];
   ignoreDirs: string[];
   codeExtensions: string[];
@@ -37,20 +37,15 @@ export const DEFAULT_CONFIG: BrickwallConfig = {
     codeLines: 250,
   },
   storyDirs: ['.ai/plans', '.ai/specs', 'docs'],
-  exemptDirs: ['.ai/completed', 'docs/archive'],
+  archiveDirs: ['.ai/completed', 'docs/archive'],
   exemptFiles: ['CHANGELOG.md'],
   // .changeset (changeset init scaffolds a README), .claude (Claude Code
-  // skills/commands are markdown), .github (issue/PR templates) would
-  // otherwise eat the md-count budget in adopter repos.
+  // skills/commands are markdown), .github (issue/PR templates), and the
+  // editor/agent config dirs (.vscode, .codex, .cursor) would otherwise
+  // eat the md-count budget in adopter repos.
   ignoreDirs: [
-    'node_modules',
-    '.git',
-    'dist',
-    'build',
-    'coverage',
-    '.changeset',
-    '.claude',
-    '.github',
+    'node_modules', '.git', 'dist', 'build', 'coverage',
+    '.changeset', '.claude', '.github', '.vscode', '.codex', '.cursor',
   ],
   codeExtensions: ['.ts', '.tsx', '.js', '.jsx'],
   banEslintDisable: true,
@@ -59,7 +54,7 @@ export const DEFAULT_CONFIG: BrickwallConfig = {
 const TOP_LEVEL_KEYS = new Set<keyof BrickwallConfig>([
   'budgets',
   'storyDirs',
-  'exemptDirs',
+  'archiveDirs',
   'exemptFiles',
   'ignoreDirs',
   'codeExtensions',
@@ -161,10 +156,10 @@ export function validateAndMergeConfig(input: unknown): BrickwallConfig {
       input.storyDirs === undefined
         ? DEFAULT_CONFIG.storyDirs
         : assertStringArray(input.storyDirs, 'storyDirs'),
-    exemptDirs:
-      input.exemptDirs === undefined
-        ? DEFAULT_CONFIG.exemptDirs
-        : assertStringArray(input.exemptDirs, 'exemptDirs'),
+    archiveDirs:
+      input.archiveDirs === undefined
+        ? DEFAULT_CONFIG.archiveDirs
+        : assertStringArray(input.archiveDirs, 'archiveDirs'),
     exemptFiles:
       input.exemptFiles === undefined
         ? DEFAULT_CONFIG.exemptFiles

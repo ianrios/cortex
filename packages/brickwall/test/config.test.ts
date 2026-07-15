@@ -98,10 +98,20 @@ describe('validateAndMergeConfig', () => {
     expect(config.exemptFiles).toEqual(['NOTES.md']);
   });
 
-  it('defaults ignoreDirs to include .changeset, .claude, and .github', () => {
-    expect(DEFAULT_CONFIG.ignoreDirs).toEqual(
-      expect.arrayContaining(['.changeset', '.claude', '.github']),
-    );
+  it('pins the exact default ignoreDirs list', () => {
+    expect(DEFAULT_CONFIG.ignoreDirs).toEqual([
+      'node_modules',
+      '.git',
+      'dist',
+      'build',
+      'coverage',
+      '.changeset',
+      '.claude',
+      '.github',
+      '.vscode',
+      '.codex',
+      '.cursor',
+    ]);
   });
 
   it('accepts a plain number for budgets.codeLines', () => {

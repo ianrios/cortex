@@ -86,7 +86,7 @@ brickwall) into `packages/brickwall`:
 
 - Config semantics (peer-reviewed 2026-07-15): **ignoreDirs** are never
   walked (defaults include `node_modules`, `.git`, `dist`, `.changeset`,
-  `.claude`, `.github`); **exemptDirs** are the archival escape valve,
+  `.claude`, `.github`); **archiveDirs** are the archival escape valve,
   walked but exempt from every check and count (petal semantics, not the
   portfolio's count-only variant); **exemptFiles** (default `CHANGELOG.md`)
   covers generated, monotonically-growing files; **storyDirs** get the
@@ -155,7 +155,7 @@ Agent governance validators — see `docs/roadmap/agent-governance/README.md`.
   layer (see `.ai/specs/ians-brain.md`). MIT stays. Publish order: open.
 - **Per-file exemptions: allowed but WARNED.** Visible config exemptions
   (data manifests etc.) pass with a printed warning — exemption debt that
-  forces eventual restructure. Archival exemptDirs stay silent (they ARE
+  forces eventual restructure. Archival archiveDirs stay silent (they ARE
   the designed lifecycle).
 - **Monorepo model (delegated to Claude): one root config with per-path
   override sections** (ESLint-flat-config style `overrides: [{dirs,

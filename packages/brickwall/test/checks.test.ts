@@ -3,6 +3,7 @@ import {
   checkCodeSize,
   checkDocSize,
   checkEslintDisable,
+  checkExemptionDebt,
   checkMdCount,
   countLines,
   isExempt,
@@ -33,16 +34,16 @@ describe('countLines', () => {
 
 describe('isExempt / resolveDocTier (tier resolution)', () => {
   const storyDirs = ['.ai/plans', '.ai/specs', 'docs'];
-  const exemptDirs = ['.ai/completed', 'docs/archive'];
+  const archiveDirs = ['.ai/completed', 'docs/archive'];
 
-  it('recognizes exempt files under an exempt dir', () => {
-    expect(isExempt('.ai/completed/foo.md', exemptDirs)).toBe(true);
-    expect(isExempt('docs/archive/old.md', exemptDirs)).toBe(true);
+  it('recognizes files under an archive dir', () => {
+    expect(isExempt('.ai/completed/foo.md', archiveDirs)).toBe(true);
+    expect(isExempt('docs/archive/old.md', archiveDirs)).toBe(true);
   });
 
-  it('does not exempt files merely prefixed by the dir name', () => {
-    expect(isExempt('docs/archived-notes.md', exemptDirs)).toBe(false);
-    expect(isExempt('.ai/completedish.md', exemptDirs)).toBe(false);
+  it('does not match files merely prefixed by the dir name', () => {
+    expect(isExempt('docs/archived-notes.md', archiveDirs)).toBe(false);
+    expect(isExempt('.ai/completedish.md', archiveDirs)).toBe(false);
   });
 
   it('resolves story tier for files under storyDirs', () => {
@@ -121,7 +122,7 @@ describe('checkMdCount', () => {
     expect(violations[0]?.type).toBe('md-count');
   });
 
-  it('excludes exempt-dir files from the count', () => {
+  it('excludes archive-dir files from the count', () => {
     const files = ['a.md', 'b.md', '.ai/completed/c.md', '.ai/completed/d.md'];
     expect(checkMdCount(files, ['.ai/completed'], [], 2)).toEqual([]);
   });
@@ -162,7 +163,7 @@ describe('checkDocSize', () => {
     expect(violations).toHaveLength(1);
   });
 
-  it('skips exempt-dir files entirely, even over budget', () => {
+  it('skips archive-dir files entirely, even over budget', () => {
     const files = [{ path: 'docs/archive/huge.md', content: makeContent(999) }];
     expect(checkDocSize(files, ['docs'], ['docs/archive'], [], budgets)).toEqual([]);
   });
@@ -182,24 +183,24 @@ describe('checkCodeSize', () => {
 
   it('passes exactly at the limit', () => {
     const files = [{ path: 'src/a.ts', content: makeContent(10) }];
-    expect(checkCodeSize(files, [], 10)).toEqual([]);
+    expect(checkCodeSize(files, [], [], 10)).toEqual([]);
   });
 
   it('fails one over the limit', () => {
     const files = [{ path: 'src/a.ts', content: makeContent(11) }];
-    const violations = checkCodeSize(files, [], 10);
+    const violations = checkCodeSize(files, [], [], 10);
     expect(violations).toHaveLength(1);
     expect(violations[0]?.type).toBe('code-size');
   });
 
   it('exempts test files', () => {
     const files = [{ path: 'src/a.test.ts', content: makeContent(999) }];
-    expect(checkCodeSize(files, [], 10)).toEqual([]);
+    expect(checkCodeSize(files, [], [], 10)).toEqual([]);
   });
 
-  it('exempts files under exemptDirs', () => {
+  it('exempts files under archiveDirs', () => {
     const files = [{ path: 'vendor/big.ts', content: makeContent(999) }];
-    expect(checkCodeSize(files, ['vendor'], 10)).toEqual([]);
+    expect(checkCodeSize(files, ['vendor'], [], 10)).toEqual([]);
   });
 
   it('applies a per-extension budget map', () => {
@@ -208,13 +209,19 @@ describe('checkCodeSize', () => {
       { path: 'src/a.scss', content: makeContent(20) },
     ];
     const map = { '.ts': 10, '.scss': 20 };
-    expect(checkCodeSize(files, [], map)).toEqual([]);
+    expect(checkCodeSize(files, [], [], map)).toEqual([]);
     const violations = checkCodeSize(
       [{ path: 'src/a.scss', content: makeContent(21) }],
+      [],
       [],
       map,
     );
     expect(violations).toHaveLength(1);
+  });
+
+  it('skips exemptFiles-matched files entirely, even over budget', () => {
+    const files = [{ path: 'src/manifest.ts', content: makeContent(999) }];
+    expect(checkCodeSize(files, [], ['manifest.ts'], 10)).toEqual([]);
   });
 });
 
@@ -256,5 +263,49 @@ describe('checkEslintDisable', () => {
       { path: 'vendor/a.ts', content: '// eslint-disable-next-line' },
     ];
     expect(checkEslintDisable(files, ['vendor'])).toEqual([]);
+  });
+});
+
+describe('checkExemptionDebt', () => {
+  const defaults = ['CHANGELOG.md'];
+
+  it('emits one exemption-debt warning enumerating EVERY basename match', () => {
+    const scanned = ['data.ts', 'src/data.ts', 'packages/x/data.ts', 'src/a.ts'];
+    const warnings = checkExemptionDebt(scanned, ['data.ts'], defaults);
+    expect(warnings).toEqual([
+      {
+        type: 'exemption-debt',
+        message:
+          'exemptFiles "data.ts" exempts 3 file(s): ' +
+          'data.ts, src/data.ts, packages/x/data.ts',
+      },
+    ]);
+  });
+
+  it('emits a stale-exemption warning for an entry matching nothing', () => {
+    const warnings = checkExemptionDebt(['README.md'], ['ghost.md'], defaults);
+    expect(warnings).toEqual([
+      {
+        type: 'stale-exemption',
+        message: 'exemptFiles "ghost.md" matches no scanned file',
+      },
+    ]);
+  });
+
+  it('keeps default entries silent whether they match or not', () => {
+    expect(checkExemptionDebt(['CHANGELOG.md'], defaults, defaults)).toEqual([]);
+    expect(checkExemptionDebt(['README.md'], defaults, defaults)).toEqual([]);
+  });
+
+  it('orders warnings by config-entry order', () => {
+    const scanned = ['b.md', 'a.md'];
+    const warnings = checkExemptionDebt(scanned, ['a.md', 'ghost.md', 'b.md'], defaults);
+    expect(warnings.map((w) => w.type)).toEqual([
+      'exemption-debt',
+      'stale-exemption',
+      'exemption-debt',
+    ]);
+    expect(warnings[0]?.message).toContain('"a.md"');
+    expect(warnings[2]?.message).toContain('"b.md"');
   });
 });

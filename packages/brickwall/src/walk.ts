@@ -72,3 +72,16 @@ export function walk(cwd: string, ignoreDirs: string[]): string[] {
   const files = gitLsFiles(cwd) ?? walkFs(cwd, ignoreDirs);
   return files.filter((f) => !isIgnoredPath(f, ignoreDirs));
 }
+
+// The ratified --all skip list: bare names only, pruned during recursion.
+const ALL_SKIP_DIRS = ['node_modules', '.git'];
+
+/**
+ * Full-scope audit walk for --all. Always an fs walk (`git ls-files` cannot
+ * see gitignored files) with ONLY node_modules and .git skipped — config
+ * ignoreDirs do not apply. Sorted so output stays deterministic (readdir
+ * order is not; git ls-files output already is).
+ */
+export function walkAll(cwd: string): string[] {
+  return walkFs(cwd, ALL_SKIP_DIRS).sort();
+}

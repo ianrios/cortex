@@ -11,7 +11,14 @@ export {
   validateAndMergeConfig,
   BrickwallConfigError,
 } from './config.js';
-export type { Violation, ViolationType, FileContent, DocTier } from './checks.js';
+export type {
+  Violation,
+  ViolationType,
+  Warning,
+  WarningType,
+  FileContent,
+  DocTier,
+} from './checks.js';
 export {
   countLines,
   isExempt,
@@ -23,5 +30,6 @@ export {
   checkDocSize,
   checkCodeSize,
   checkEslintDisable,
+  checkExemptionDebt,
 } from './checks.js';
-export { walk } from './walk.js';
+export { walk, walkAll } from './walk.js';
