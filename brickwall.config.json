@@ -1,0 +1,19 @@
+{
+  "storyDirs": ["docs", ".ai/plans", ".ai/specs"],
+  "exemptDirs": [
+    ".ai/completed",
+    "docs/archive",
+    "docs/roadmap/agent-governance"
+  ],
+  "ignoreDirs": [
+    "node_modules",
+    ".git",
+    "dist",
+    "build",
+    "coverage",
+    ".changeset",
+    ".claude",
+    ".github",
+    "packages/brickwall/test/fixtures"
+  ]
+}

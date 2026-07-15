@@ -1,0 +1,23 @@
+{
+  "name": "cortex-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Agent-agnostic developer toolkit: context budgets, quality harnesses, agent workflow patterns.",
+  "type": "module",
+  "packageManager": "pnpm@11.1.2",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "check": "pnpm typecheck && pnpm test && node packages/brickwall/dist/cli.js",
+    "changeset": "changeset"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.0",
+    "typescript": "^5.6.0"
+  }
+}

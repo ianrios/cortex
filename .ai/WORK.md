@@ -1,15 +1,17 @@
 Current focus:
 
-- Phase 1: context limiter engine (`packages/brickwall`)
+- Ian's review of Phase 1 (built, gates green, awaiting his approval —
+  gates passing is not done)
 
 In progress:
 
-- Monorepo scaffold (pnpm workspace, changesets, vitest)
-- Port of portfolio validate.ts structural checks into configurable package
+- (nothing until Phase 1 is ratified)
 
 Done:
 
 - Phase 0: repo reset, founding plan, `.ai/` skeleton (2026-07-15)
+- Phase 1 implementation: `@ianrios/brickwall` + monorepo scaffold,
+  79 tests, repo passes its own limiter via `pnpm check` (2026-07-15)
 
 Not in scope right now:
 
