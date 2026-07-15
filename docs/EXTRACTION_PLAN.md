@@ -148,16 +148,24 @@ the config surface is right. Then WRC and the other repos.
 
 Agent governance validators — see `docs/roadmap/agent-governance/README.md`.
 
-## Open decisions (Ian)
+## Decisions (ratified by Ian, 2026-07-15)
 
-- Ratify `brickwall`; license (MIT placed); standalone publish order.
-- Per-file code-size exemptions: the portfolio exempts its two data
-  manifests (`data.ts`, `adminData.ts`) via a config list. Allowed pattern
-  (visible config, not inline comments) or must the portfolio restructure?
-- Monorepo model: one root config for a whole workspace vs per-package
-  configs. Shapes petal's migration; decide before Phase 5.
-- Default ignore set ratification (`.claude`, `.github`, `.changeset`) and
-  `CHANGELOG.md` exemption.
+- **`brickwall` ratified** as the package name — and reframed as one MODE
+  of the limiter; presets (brickwall/multiband/soft) are a future config
+  layer (see `.ai/specs/ians-brain.md`). MIT stays. Publish order: open.
+- **Per-file exemptions: allowed but WARNED.** Visible config exemptions
+  (data manifests etc.) pass with a printed warning — exemption debt that
+  forces eventual restructure. Archival exemptDirs stay silent (they ARE
+  the designed lifecycle).
+- **Monorepo model (delegated to Claude): one root config with per-path
+  override sections** (ESLint-flat-config style `overrides: [{dirs,
+  budgets…}]`), not nested per-package files. One source of truth to
+  audit, works for partial installs, matches Ian's instinct for "one file
+  with sections per sub-repo". Implement when petal migration needs it.
+- **Default ignores**: `.claude`, `.codex`, `.cursor`, `.vscode`,
+  `.github`, `.changeset` + CHANGELOG exemption — revisable over time.
+  Plus a **`--all` superadmin flag** scanning everything (agents may hide
+  docs in ignored dirs to bypass the checks; audit view required).
 
 ## Peer review record
 
