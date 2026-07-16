@@ -1,5 +1,7 @@
 Current focus:
 
+- NEXT SESSION: interview-first — read
+  .ai/plans/2026-07-16-interview-handoff.md before anything else
 - ALPHA REACHED (2026-07-16): Phase 1.1 landed, brickwall dogfooded in
   petal + ianrios.github.io, snapshot flow verified, CI workflow in.
   Publish: Ian decided NEITHER yet (2026-07-16) — keep vendored tarballs
