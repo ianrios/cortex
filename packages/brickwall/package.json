@@ -1,6 +1,9 @@
 {
   "name": "@ianrios/brickwall",
   "version": "0.0.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "A brickwall limiter for your repo's context — hard ceilings on docs and code so agents never clip.",
   "type": "module",
   "license": "MIT",
