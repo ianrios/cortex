@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 function toPosix(path: string): string {
@@ -56,7 +56,10 @@ function gitLsFiles(cwd: string): string[] | undefined {
     return out
       .split('\n')
       .filter((line) => line.length > 0)
-      .map(toPosix);
+      .map(toPosix)
+      // The index can list files missing from the working tree (unstaged
+      // deletions); brickwall reads only the working tree, so drop them.
+      .filter((f) => existsSync(join(cwd, f)));
   } catch {
     return undefined;
   }

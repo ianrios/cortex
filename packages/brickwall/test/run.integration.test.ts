@@ -151,6 +151,24 @@ describe('run() in temp repos (warnings + --all discovery)', () => {
     ]);
   });
 
+  it('skips tracked files deleted from the working tree (unstaged deletion)', () => {
+    // Found dogfooding petal: git ls-files --cached lists a file whose
+    // deletion is unstaged; reading it crashed with a raw ENOENT.
+    dir = makeTmpRepo({ budgets: { mdLines: 2 } });
+    execFileSync('git', ['init'], { cwd: dir, stdio: 'ignore' });
+    writeFileSync(join(dir, 'doomed.md'), 'a\nb\nc\nd\n');
+    execFileSync('git', ['add', 'doomed.md'], { cwd: dir, stdio: 'ignore' });
+    execFileSync(
+      'git',
+      ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-m', 'x'],
+      { cwd: dir, stdio: 'ignore' },
+    );
+    rmSync(join(dir, 'doomed.md'));
+
+    const { violations } = run({ cwd: dir });
+    expect(violations).toEqual([]);
+  });
+
   it('disables archiveDirs and exemptFiles under --all (warnings empty too)', () => {
     dir = makeTmpRepo({
       budgets: { mdLines: 2 },
