@@ -29,3 +29,7 @@ Exemption happens through visible lifecycle (archive dirs), never inline.
 
 **Do not explain Ian's instructions back to him when corrected.** Fix it,
 say what changed, move on.
+
+**Never `git add -A` in a shared working tree.** It swept an unreviewed
+file Ian had marked DO-NOT-COMMIT into a pushed commit (2026-07-16).
+Stage files by explicit path; review anything you didn't create.

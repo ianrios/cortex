@@ -96,6 +96,29 @@ It is possible that people could run the tools (specifically brickwall, but any/
 
 I imagine we need to allow users to be able to configure their limits for character count (possibly pulled from eslint config if it exists (or other known and widely used configs for other ts packages or different languages entirely) or overridden in the brickwall config) and file count and line count in files for the various types of files (docs vs code at the very rudimentary level) and directories (everyone has different systems and if we start a new repo from scratch, that could potentially look very different from an existing legacy codebase that immediately fails the brickwall limit) - i know this is the fact looking at ianrios.github.io, petal, wrc, and my other repos (which we need to make sure we dogfood for all of them), and I will try to look for other repos that I own (or dont own) and attempt to dogfood the brickwall package with the new repos to see what fits and what fails. I see a world where there are a lot more config settings than what already exists, as well as a lot of config settings that already exist but probably need to be cleaned up due to only mainly being used on a small codebase and not a org scale repo like a true service or api layer
 
+## Git aware brickwall
+
+I see a world where upon running brickwall, it could be useful to specifically add a flag or something to only compare the current diff of the branch you are on to the previous commit, or something like that, could be helpful for developers who have thousands of files in their repo and dont want to run the whole suite on just their pr.
+
+## The Great Flattening (X article, read 2026-07-16, file discarded per Ian)
+
+The myprasanna article behind the deleted-framework lesson. Its claims
+that matter for cortex (rest is Vorflux marketing):
+
+- "Every model release eats the layer beneath it" — labs ship your
+  hand-rolled mechanics as defaults next quarter. The two things labs
+  structurally can't ship: YOUR judgment encoded where it executes, and
+  cross-lab neutrality. Cortex is exactly those two: repo-owned encoded
+  judgment (budgets, anti-patterns, workflows) + agent-agnostic adapters.
+- Docs decay, harnesses don't: "write principles in a doc and they decay
+  the day after; put them in the harness and it applies that judgment a
+  thousand times." Brickwall = docs that gate instead of decay.
+- Cross-lab adversarial review (a different model family tears the work
+  apart) is the check no lab will ship — supports the zero-context
+  peer-review pattern and Ian's multi-provider subagent vision.
+- Six-bottleneck taxonomy (machine, planning, orchestration, testing,
+  review, merge) — useful frame for the Phase 4 workflow kit.
+
 ## File compression
 
 Known set of rules to remove prose. What if agents wrote as though sentences can’t be summarized? read: https://www.saveourenvironment.ca/Several%20Short%20Sentences%20About%20Writing%20-%20Verlyn%20Klinkenborg.pdf

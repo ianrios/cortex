@@ -55,3 +55,7 @@ Open questions (dogfood friction = roadmap input; details in archived plans):
 
 Resolved this session: `archiveDirs` rename DONE; suspicious-ignore
 heuristic NOT built (janitor agent stays in BACKLOG.md).
+
+Next session input: .ai/specs/cleanup.md — Ian's pre-release cleanup +
+design questions (2026-07-16); presets metaphor retracted (BACKLOG.md);
+X article consumed into ians-brain.md and discarded per Ian's directive.

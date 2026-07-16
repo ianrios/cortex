@@ -12,9 +12,10 @@ into `.ai/plans/` only when picked up.
   exempt config for suspicious entries and inspects what accumulates in
   ignored dirs — Ian's alternative to over-prescriptive built-in
   heuristics (see Phase 1.1 plan amendments).
-- **Preset layer** (post-first-publish, decided): named config bundles —
-  brickwall / multiband / soft — mapping the mastering metaphor onto
-  rigid-vs-loose enforcement styles.
+- **Enforcement-style config bundles** (post-first-publish): rigid vs
+  loose named presets. Ian RETRACTED the mastering-metaphor naming
+  (brickwall/multiband/soft) on 2026-07-16 — "corny", prefer clear names
+  over one-domain whimsy; see .ai/specs/cleanup.md item on naming.
 - **8-stage build pipeline package**: Ian still uses it conceptually;
   recover spec from `~` repo commit `f506851` when the workflow-kit
   phase starts.
