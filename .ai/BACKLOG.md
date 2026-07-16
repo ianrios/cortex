@@ -21,3 +21,8 @@ into `.ai/plans/` only when picked up.
   phase starts.
 - **Steering-compression A/B protocol**: repeat the deleted-framework
   experiment to validate brickwall's default numbers with evidence.
+- **Memory-fold tool** (Ian, 2026-07-16: "a critical piece of the cortex
+  toolkit"): codify the session-close practice in
+  .ai/specs/memory-folding.md into something all cortex-consuming agents
+  run — converting session findings into durable docs/memories (left
+  shift). Pairs with clinical's retro-first mechanics and the janitor.

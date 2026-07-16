@@ -33,3 +33,10 @@ say what changed, move on.
 **Never `git add -A` in a shared working tree.** It swept an unreviewed
 file Ian had marked DO-NOT-COMMIT into a pushed commit (2026-07-16).
 Stage files by explicit path; review anything you didn't create.
+
+**A package's engines floor is not the toolchain's floor.** CI matrixed
+the whole pnpm workflow on node 20 to "test engines >=20"; pnpm 11 needs
+22.13+, so every run failed at install and fail-fast hid the node-24
+result too. Test the BUILT ARTIFACT on the floor version; run the
+toolchain on the dev version. Local simulation on one node version
+proves nothing about the matrix. (2026-07-16, fixed in be83581.)

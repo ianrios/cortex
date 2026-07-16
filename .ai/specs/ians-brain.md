@@ -100,6 +100,16 @@ I imagine we need to allow users to be able to configure their limits for charac
 
 I see a world where upon running brickwall, it could be useful to specifically add a flag or something to only compare the current diff of the branch you are on to the previous commit, or something like that, could be helpful for developers who have thousands of files in their repo and dont want to run the whole suite on just their pr.
 
+## Memory folding as a product (2026-07-16)
+
+The session-close practice — short-term findings folded into long-term
+homes (anti-patterns, friction lists, this file, agent-local memory) —
+is not a habit, it is a CRITICAL CORTEX PIECE: buildable, shippable,
+consumed by every agent using cortex. Left-shifting knowledge so future
+agents never re-hit the same wall. Process now specced in
+.ai/specs/memory-folding.md; tool version in BACKLOG (retro agent +
+janitor territory).
+
 ## The Great Flattening (X article, read 2026-07-16, file discarded per Ian)
 
 The myprasanna article behind the deleted-framework lesson. Its claims
