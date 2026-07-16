@@ -13,10 +13,6 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        # engines floor and the version we develop on
-        node: [20, 24]
     steps:
       - uses: actions/checkout@v4
 
@@ -26,7 +22,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 24
           cache: pnpm
 
       - name: Install
@@ -38,3 +34,13 @@ jobs:
       # typecheck -> tests -> brickwall self-check against this repo
       - name: Check
         run: pnpm check
+
+      # brickwall ships engines >=20, but pnpm 11 needs node >=22.13, so
+      # the floor can't run the toolchain. Prove the built, zero-dependency
+      # CLI itself on the floor instead.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Self-check on the engines floor (node 20)
+        run: node --version && node packages/brickwall/dist/cli.js
