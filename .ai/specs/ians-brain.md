@@ -88,8 +88,25 @@ ignored dirs and config intelligently instead. He self-checks
 prescriptiveness constantly ("or am I being too prescriptive?") — the
 deleted-framework lesson applied forward.
 
+## Use within the development chain
+
+It is possible that people could run the tools (specifically brickwall, but any/all) in the following locations: in the agent loop, in the git hook on commit, in the ci/cd process as part of the merge / deploy strategy. This enables us to add more or less filtering and limiting depending on where we are in the process. Perhaps during agent development, the brickwall acts as a warning system, limiting up to a point but not being so rigid. Pre commit hook, it checks the docs folders and confirms files are limited, forcing agents to move them to the correct location and mark files as complete. On merge / deploy, it limits what gets built, removing documentation and product knowledge from the src dist. I imagine there are more ways to organize this and also ways to leverage the config and our scripts to know when and where to do what, and also configure how similar each of those steps looks.
+
+## Brickwall config settings
+
+I imagine we need to allow users to be able to configure their limits for character count (possibly pulled from eslint config if it exists (or other known and widely used configs for other ts packages or different languages entirely) or overridden in the brickwall config) and file count and line count in files for the various types of files (docs vs code at the very rudimentary level) and directories (everyone has different systems and if we start a new repo from scratch, that could potentially look very different from an existing legacy codebase that immediately fails the brickwall limit) - i know this is the fact looking at ianrios.github.io, petal, wrc, and my other repos (which we need to make sure we dogfood for all of them), and I will try to look for other repos that I own (or dont own) and attempt to dogfood the brickwall package with the new repos to see what fits and what fails. I see a world where there are a lot more config settings than what already exists, as well as a lot of config settings that already exist but probably need to be cleaned up due to only mainly being used on a small codebase and not a org scale repo like a true service or api layer
+
+## File compression
+
+Known set of rules to remove prose. What if agents wrote as though sentences can’t be summarized? read: https://www.saveourenvironment.ca/Several%20Short%20Sentences%20About%20Writing%20-%20Verlyn%20Klinkenborg.pdf
+If we follow these practices, plans and other docs can be trimmed using these rules. The planning agent should know these rules. The compression agent (when brickwall says files are too long or need to be compressed) should know these rules. We must always use progressive disclosure to avoid duplicating prose across multiple files, which will naturally help reduce prose and cut down file counts. Code snippets have no business living in documentation. Deep link to code examples instead.
+
 ## Site/publishing posture
 
 No wheel reinvention: README + docs in the monorepo first, maybe a GitHub
 Pages static splash later, open to existing toolkit-site solutions
 (Starlight/VitePress class), possibly just GitHub wiki long-term.
+
+## useful doc about current state of agentic coding
+
+/Users/ianrios/Sites/cortex/.ai/specs/The Great Flattening (x article).md
