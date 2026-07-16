@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm *)",
+      "Bash(node *)",
+      "Bash(python3 *)",
+      "Bash(git *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(tar *)",
+      "Bash(sed *)",
+      "Bash(perl *)",
+      "Bash(awk *)",
+      "Bash(echo *)",
+      "Bash(mkdir *)",
+      "Bash(rm *)",
+      "Read(**)"
+    ]
+  }
+}
