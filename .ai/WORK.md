@@ -2,9 +2,9 @@ Current focus:
 
 - ALPHA REACHED (2026-07-16): Phase 1.1 landed, brickwall dogfooded in
   petal + ianrios.github.io, snapshot flow verified, CI workflow in.
-  Awaiting Ian: tag 0.1.0 vs `changeset publish --snapshot alpha`
-  (commands in .ai/completed/2026-07-16-alpha-plumbing.md), and push to
-  GitHub for the workflow's first real run.
+  Publish: Ian decided NEITHER yet (2026-07-16) — keep vendored tarballs
+  until the friction backlog shrinks; commands live in
+  .ai/completed/2026-07-16-alpha-plumbing.md when wanted.
 
 Done:
 
