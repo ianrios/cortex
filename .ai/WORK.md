@@ -1,12 +1,13 @@
 Current focus:
 
-- Session beta (2026-07-16): interview held, decisions ratified — see
-  .ai/plans/2026-07-16-session-beta.md. Config-surface redesign proposal
-  (.ai/plans/2026-07-16-config-surface.md) awaits Ian's name-by-name
-  ratification; NO renames/behavior changes implemented before his yes.
-- Next dogfood wave: real production repos from Ian's external drive
-  (NDA rule in RULES.md); benchmark scale there — Rust question decided
-  by measured numbers, not fear. No synthetic-repo generator (Ian).
+- Config-surface redesign (.ai/plans/2026-07-16-config-surface.md,
+  rev 3): items 1-2, 4b-8 RATIFIED by Ian 2026-07-17 (ADRs 0001/0002);
+  the unified symmetric docs/code tier shape is the ONE open item — no
+  implementation before his yes on it.
+- Scale MEASURED 2026-07-17 (NDA repos, recorded generically): 31k-file
+  non-git monolith full run 4.1s; 2k-file git repo 0.9s. Rust question
+  closed by numbers. Dogfood queue: .ai/specs/dogfood-queue.md (public
+  half; NDA half lives on the drive per RULES.md).
 - ALPHA state (2026-07-16): brickwall dogfooded in petal +
   ianrios.github.io, snapshot flow verified, CI green. Publish: NEITHER
   yet — vendored tarballs until the friction backlog shrinks; commands
@@ -42,8 +43,6 @@ Not in scope right now:
 Open questions (dogfood friction = roadmap input; details in archived plans):
 
 - Tag vs snapshot-publish for the alpha (Ian) + publish order (open)
-- archiveDirs/storyDirs root-prefix-only vs ignoreDirs any-depth bare
-  names — asymmetric matching semantics
 - Violation messages carry no remediation guidance (petal's script had it)
 - Naive pragma regex flags comments MENTIONING the ban — bit the
   portfolio migration itself; migration docs should warn

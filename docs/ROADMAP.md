@@ -91,3 +91,10 @@ phase's infra decisions as deliberate practice: write a short ADR in
   on them.
 - `cortex init --diff` template drift viewer.
 - A docs site, if adoption warrants it.
+- Reserved config/CLI surface, designed-not-built (ratified 2026-07-17;
+  detail in the config-surface plan): per-path `overrides` sections for
+  monorepos, `extends` for arrays, `--staged`, growing the DEFAULT
+  `docs.extensions` list beyond `.md` (the key itself is in the
+  proposed shape).
+- Environment-preflight tooling (node version, install, server up/down)
+  — the server-runner agent's deterministic half; see BACKLOG.
