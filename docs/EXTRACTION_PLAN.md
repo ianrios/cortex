@@ -127,6 +127,13 @@ and AGENTS.md/CLAUDE.md starters. Honors the copy-then-edit rule —
 templates are real files copied in, never regenerated. Decide here whether
 an umbrella `cortex` bin owns `init`/`check`.
 
+Insights folded 2026-07-16 (design detail in
+`.ai/plans/2026-07-16-config-surface.md`; Ian's originals in
+`.ai/specs/ians-brain.md`): the eslint-disable ban generalizes to a
+per-language `bannedPragmas` list; budgets should be importable from
+existing lint configs; `cortex init` writes fully-resolved arrays into
+generated configs (array keys replace defaults — nothing invisible).
+
 ### Phase 4 — Agent workflow kit
 
 Genericize into the patterns layer, naming sources precisely: clinical's

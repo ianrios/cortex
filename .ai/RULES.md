@@ -19,3 +19,5 @@ Repo-specific:
 - Defaults come from the source repos' proven numbers; everything
   overridable, nothing silently ignorable
 - Real decisions with real alternatives get a short ADR in docs/adr/
+- NDA dogfood repos are test subjects, never sources: no code, paths,
+  company or product names enter cortex; record findings generically

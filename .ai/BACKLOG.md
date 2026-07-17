@@ -11,7 +11,14 @@ into `.ai/plans/` only when picked up.
 - **Janitor agent package**: a shipped cortex agent that audits ignore/
   exempt config for suspicious entries and inspects what accumulates in
   ignored dirs — Ian's alternative to over-prescriptive built-in
-  heuristics (see Phase 1.1 plan amendments).
+  heuristics (see Phase 1.1 plan amendments). For already-drifted docs
+  (ratified 2026-07-16): find duplicate-claim candidates
+  deterministically → cluster → Ian ratifies the canonical version →
+  rewrite losers into deep links. Ratification is non-negotiable.
+- **Server-runner agent**: environment preflight + repo bootstrap —
+  honor .nvmrc/engines, install, dev-server up/down; petal's
+  `scripts/setup.sh` is the concrete example, and per-repo Node engines
+  bit both dogfood migrations (Ian, 2026-07-16).
 - **Enforcement-style config bundles** (post-first-publish): rigid vs
   loose named presets. Ian RETRACTED the mastering-metaphor naming
   (brickwall/multiband/soft) on 2026-07-16 — "corny", prefer clear names

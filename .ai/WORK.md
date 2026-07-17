@@ -1,12 +1,16 @@
 Current focus:
 
-- NEXT SESSION: interview-first — read
-  .ai/plans/2026-07-16-interview-handoff.md before anything else
-- ALPHA REACHED (2026-07-16): Phase 1.1 landed, brickwall dogfooded in
-  petal + ianrios.github.io, snapshot flow verified, CI workflow in.
-  Publish: Ian decided NEITHER yet (2026-07-16) — keep vendored tarballs
-  until the friction backlog shrinks; commands live in
-  .ai/completed/2026-07-16-alpha-plumbing.md when wanted.
+- Session beta (2026-07-16): interview held, decisions ratified — see
+  .ai/plans/2026-07-16-session-beta.md. Config-surface redesign proposal
+  (.ai/plans/2026-07-16-config-surface.md) awaits Ian's name-by-name
+  ratification; NO renames/behavior changes implemented before his yes.
+- Next dogfood wave: real production repos from Ian's external drive
+  (NDA rule in RULES.md); benchmark scale there — Rust question decided
+  by measured numbers, not fear. No synthetic-repo generator (Ian).
+- ALPHA state (2026-07-16): brickwall dogfooded in petal +
+  ianrios.github.io, snapshot flow verified, CI green. Publish: NEITHER
+  yet — vendored tarballs until the friction backlog shrinks; commands
+  in .ai/completed/2026-07-16-alpha-plumbing.md.
 
 Done:
 
@@ -38,13 +42,9 @@ Not in scope right now:
 Open questions (dogfood friction = roadmap input; details in archived plans):
 
 - Tag vs snapshot-publish for the alpha (Ian) + publish order (open)
-- No "extend defaults" syntax — hypothesized in both migrations, needed
-  in NEITHER; keep watching before designing it
 - archiveDirs/storyDirs root-prefix-only vs ignoreDirs any-depth bare
   names — asymmetric matching semantics
 - Violation messages carry no remediation guidance (petal's script had it)
-- Test files escape the eslint-disable ban; README overclaims — should
-  the ban be total? (portfolio also skipped tests, petal did not)
 - Naive pragma regex flags comments MENTIONING the ban — bit the
   portfolio migration itself; migration docs should warn
 - Tarball-in-place updates need fresh add (integrity pins, both pms) —
@@ -55,9 +55,14 @@ Open questions (dogfood friction = roadmap input; details in archived plans):
 - Per-repo Node engines bit both migrations — USAGE.md agent section
   should say "honor .nvmrc/engines before installing"
 
-Resolved this session: `archiveDirs` rename DONE; suspicious-ignore
-heuristic NOT built (janitor agent stays in BACKLOG.md).
+Resolved 2026-07-16 (interview; details in session-beta plan): extend
+defaults NOT built — replace semantics documented, init writes resolved
+arrays; test-file escape from the pragma ban WILL close +
+testFilePatterns config (config-surface proposal); changelog cut over
+to packages/brickwall/CHANGELOG.md; portfolio's kept scripts confirmed
+intentional (Phase 2 userland).
 
-Next session input: .ai/specs/cleanup.md — Ian's pre-release cleanup +
-design questions (2026-07-16); presets metaphor retracted (BACKLOG.md);
-X article consumed into ians-brain.md and discarded per Ian's directive.
+Still to interview (round 2): .ai/ audience + cortex init UX,
+monorepo/multi-repo semantics, custom agents w/ scoped skills, file
+compression, AGENTS.md rigidity, arborist collab, branding, cleanup.md
+de-Ian-ing/README tone/legacy-doc deletion.

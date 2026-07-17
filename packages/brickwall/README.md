@@ -19,7 +19,9 @@ so agents never clip. Zero runtime dependencies. ESM-only. Node >= 20.
 
 Looked up at the cwd: `brickwall.config.json` or a `"brickwall"` key in
 `package.json`. Both at once, or any unknown key, is a config error. No
-config at all uses the defaults below.
+config at all uses the defaults below. Array keys REPLACE their default
+lists when set — they never extend them (setting `storyDirs` discards
+the default entries); `budgets` merges per key over the defaults.
 
 ```jsonc
 {
@@ -65,12 +67,6 @@ or `stale-exemption` (matches nothing).
 `--all` is an audit view for humans/agents, NOT a CI gate: an fs walk
 skipping ONLY `node_modules` and `.git`, with `ignoreDirs`/`archiveDirs`/
 `exemptFiles` disabled. Build output and test fixtures WILL fire.
-
-## Changelog (pre-publish)
-
-- 2026-07-15 — BREAKING: `--json` output was a bare violations array, now
-  `{ violations, warnings }`; `exemptDirs` renamed `archiveDirs`. Added
-  `--all`, the warnings channel, default ignores `.vscode`/`.codex`/`.cursor`.
 
 ## Programmatic use
 
