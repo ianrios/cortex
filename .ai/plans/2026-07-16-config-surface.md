@@ -1,10 +1,11 @@
 # Config-surface redesign proposal (2026-07-16)
 
-Status: revision 3. Rev 1-2 were adversarially peer-reviewed
-(zero-context, 6+1 blocking findings, all resolved). Rev 3 folds Ian's
-ratification round (2026-07-17): most items RATIFIED; the remaining
-open design is the unified docs/code symmetry he asked for. Nothing is
-implemented until the shape below gets his yes.
+Status: revision 4. Rev 1-3 were adversarially peer-reviewed three
+times (zero-context; all blocking findings resolved). Rev 4 folds
+Ian's second steer (2026-07-17): unify FURTHER — one selector grammar
+for section membership AND tiers, so dirs and file patterns work
+everywhere. Most items RATIFIED; the rev 4 shape below is the single
+remaining item awaiting his final yes. Nothing implemented before it.
 
 ## Design principles
 
@@ -17,22 +18,22 @@ implemented until the shape below gets his yes.
 6. NEW (Ian, ratification round): `docs` and `code` must READ the same
    — asymmetric sections confuse both humans and agents.
 
-## Proposed shape, rev 3 (defaults shown; sections now symmetric)
+## Proposed shape, rev 4 (defaults shown; ONE selector grammar)
 
 ```jsonc
 {
   "docs": {
-    "extensions": [".md"],          // restored: .txt/.rst repos exist
-    "maxCount": 25,                 // docs-only concept (see below)
+    "matches": [{ "patterns": [".md"] }],   // membership, see below
+    "maxCount": 25,                         // docs-only concept
     "maxLines": 80,
     "tiers": [
       { "dirs": [".ai/plans", ".ai/specs", "/docs"], "maxLines": 280 }
     ]
   },
   "code": {
-    "extensions": [".ts", ".tsx", ".js", ".jsx"],
+    "matches": [{ "patterns": [".ts", ".tsx", ".js", ".jsx"] }],
     "maxLines": 250,
-    "tiers": [],                    // e.g. [{ "patterns": ["*.scss"],
+    "tiers": [],                    // e.g. [{ "patterns": [".scss"],
                                     //         "maxLines": 600 }]
     "testFilePatterns": [".test.", ".spec."]  // code-only concept
   },
@@ -44,37 +45,59 @@ implemented until the shape below gets his yes.
 }
 ```
 
-The two sections are identical — `extensions`, `maxLines`, `tiers` —
-except each carries exactly one domain-specific key: docs have a COUNT
-cap, total across all doc extensions (doc sprawl is the disease
-brickwall treats; nobody caps code file count), code has TEST files
-(docs don't). The asymmetry that remains is
-conceptual, not structural.
+**The selector — Ian's second steer, and the whole design now**:
+`{ dirs?, patterns? }`, ONE grammar used in exactly two places:
 
-**Shared tier shape** (this replaces rev 2's suffix-map, per Ian's
-"why is code so different"): `{ dirs?, patterns?, maxLines }`. At least
-one of `dirs`/`patterns` required; when both are present both must
-match (e.g. scss only under src/legacy). FIRST matching tier in config
-order wins; no match falls to the section's `maxLines`. One resolution
-rule for both sections — rev 2 had longest-suffix for code maps and
-order-based for doc tiers; that split is gone, and the map's
-"must cover every extension" validation is unnecessary (the section
-default always exists, nothing is ever uncapped).
+- **Section membership**: `matches` is a selector LIST — any selector
+  claims the file. Rev 3 membership was extension-only; now docs
+  sprinkled anywhere keep `[{ "patterns": [".md"] }]`, a repo whose
+  docs/ dir is the whole truth writes `[{ "dirs": ["/docs"] }]` (any
+  extension), and a mixed case writes `[{ "dirs": ["/docs"],
+  "patterns": [".md", ".txt", ".html"] }]` — html is docs THERE, code
+  elsewhere. The rev 3 `extensions` key is GONE: bare `.md` already
+  normalizes to pattern `*.md`, so extensions were a second spelling
+  of the same fact.
+- **Tiers**: a selector + required `maxLines`. FIRST matching tier in
+  config order wins; no match falls to the section's `maxLines`.
+
+Selector semantics (both places, identically): within a field ANY
+entry matches; across present fields ALL must match (scss only under
+src/legacy); at least one field required, else config error (exit 2).
+`matches: []` is a config error too — an empty list would silently
+disable a whole section's checks, and nothing escapes silently. Two
+identical selectors in one list: also an error.
+
+**Cross-section claims** (4th peer review: without precedence, the
+whole-docs-dir case would ERROR on any .ts file inside it — code
+samples in docs dirs are normal): when both sections claim a file, a
+selector WITH `dirs` beats one without (naming a place is more
+specific than naming a type — so `{"dirs": ["/docs"]}` takes
+/docs/example.ts away from the global code patterns, and html-in-docs
+vs html-as-code-elsewhere works); if both have `dirs`, the longer
+matched prefix wins; still tied → loud per-file config error naming
+the file. Files matching neither section are not scanned (unchanged).
+Documented caveats, naive by design: a dirs-only docs selector claims
+binaries too — they consume `maxCount` and get line-counted (pair
+`patterns` when a dir is mixed); non-code files matching
+`testFilePatterns` under a docs claim are ordinary docs
+(`testFilePatterns` is code-only).
+
+Docs keep the COUNT cap (total across everything `matches` claims;
+doc sprawl is the disease brickwall treats — nobody caps code file
+count), code keeps TEST files. The remaining asymmetry is conceptual,
+not structural.
 
 Pattern grammar: entries normalize to `*<suffix>` (bare `.scss` =
 `*.scss`), matched against the basename — so `README.md` also catches
-`API-README.md`, naive by design. Duplicate rule, rescoped for tiers
-(peer review): duplicates WITHIN one tier's `patterns` are a config
-error, as are two tiers with identical `(dirs, patterns)`; the SAME
-pattern across different tiers is legitimate first-match layering
-(src/legacy scss at 600, all other scss at 400). Within `dirs` and
-within `patterns` a tier matches on ANY entry; across the two fields
-BOTH must match; a tier with neither is a config error (exit 2).
-`testFilePatterns` stay naive path substrings.
+`API-README.md`, naive by design. Duplicate rule (peer review):
+duplicates WITHIN one selector's `patterns` are a config error, as are
+two tiers with identical `(dirs, patterns)`; the SAME pattern across
+different tiers is legitimate first-match layering (src/legacy scss at
+600, all other scss at 400). `testFilePatterns` stay naive path
+substrings. Dir entries follow ratified item 6 (bare = any depth,
+slash = root prefix, leading `/` root-anchors).
 
-Two guards (peer review): an extension in BOTH `docs.extensions` and
-`code.extensions` is a loud config error — no file is ever scanned
-under two regimes. A tier matching zero scanned files warns as
+Guard (peer review): a tier matching zero scanned files warns as
 `stale-tier` (the `stale-exemption` pattern) — dead or fully-shadowed
 tiers are never silent.
 
@@ -88,17 +111,20 @@ writes resolved arrays (ratified).
   `docs.maxCount`, capped at the default 80 — today's behavior, kept.
   Tiers with `patterns` can now target strays by name (e.g. every
   `README.md` gets its own cap) if a repo ever needs it.
-- **docs.extensions restored — PROPOSED, part of the open shape** (his
-  .txt question): adding it later would have been non-breaking, but
-  symmetry (principle 6) and known-plausible repos argue for now.
-  Default stays `[".md"]`; growing that default is what stays
-  roadmapped, not the key itself.
+- **Non-md docs** (his .txt question): covered by `matches` patterns —
+  no dedicated key needed at all. Default membership stays md-only;
+  growing that DEFAULT stays roadmapped.
+- **"What if docs have no special directory / are sprinkled?"** (his
+  rev 4 steer): membership by patterns needs no dirs; membership by
+  dirs needs no patterns; both combine. Same grammar either way.
 - **"Can't the config file be a file brickwall knows to ignore?"**
-  (item 5 self-flag): it already is — `.json` is not a code extension,
-  so `brickwall.config.json` is never scanned. The self-flag lives in
-  brickwall's own TypeScript source, where `DEFAULT_CONFIG` names the
-  pragma. His instinct IS the fix: those default values move to a JSON
-  data file the scanner never reads. Visible data, no inline dodge.
+  (item 5 self-flag): under defaults it already is — `.json` matches
+  no default selector, so `brickwall.config.json` is never scanned
+  (config-relative, not structural: a dirs-only selector over the root
+  would claim it). The self-flag lives in brickwall's own TypeScript
+  source, where `DEFAULT_CONFIG` names the pragma. His instinct IS the
+  fix: those default values move to a JSON data file no default
+  selector reads. Visible data, no inline dodge.
 
 ## Ratification status
 
@@ -106,7 +132,7 @@ writes resolved arrays (ratified).
 | ---- | ------ |
 | 1. `docs`/`code` groups replace flat budgets | RATIFIED |
 | 2. tiers replace storyDirs/storyLines | RATIFIED as concept |
-| 3+4 unified tier shape, incl. restored `docs.extensions` | **OPEN — the rev 3 shape above** |
+| 3+4 unified selector grammar (`matches` + tiers) | **OPEN — the rev 4 shape above** |
 | 4b. testFilePatterns; pragma ban closes over tests | RATIFIED |
 | 5. bannedPragmas, bare substring, JSON-data escape | RATIFIED |
 | 6. one dir rule (bare=any depth, slash=root, `/`-anchor) | RATIFIED |
@@ -148,3 +174,9 @@ repo-wide in every mode; zero runtime dependencies; walker mechanics.
 - README/USAGE rewrite; `--json` types `eslint-disable`→`banned-pragma`
   AND `md-count`→`doc-count` (docs may be non-md now; messages say
   "doc files"); ~97 tests touched mechanically. No external consumers.
+- Portfolio config under rev 4:
+  `code.matches: [{ "patterns": [".ts", ".tsx", ".js", ".jsx",
+  ".scss"] }]` + one scss tier — same constraints, fewer concepts.
+- Behavioral no-op to protect in the test rewrite: old md detection
+  was path-`endsWith('.md')`, new is basename-suffix `*.md` — provably
+  identical for slash-free patterns; don't let anyone "fix" it.
