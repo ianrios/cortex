@@ -9,6 +9,11 @@
     "docs/archive",
     "docs/roadmap/agent-governance"
   ],
+  "exemptFiles": [
+    "CHANGELOG.md",
+    ".ai/specs/current-state-review.md",
+    ".ai/specs/cortex-brain-example.md"
+  ],
   "ignoreDirs": [
     "node_modules",
     ".git",

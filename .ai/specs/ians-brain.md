@@ -140,6 +140,46 @@ No wheel reinvention: README + docs in the monorepo first, maybe a GitHub
 Pages static splash later, open to existing toolkit-site solutions
 (Starlight/VitePress class), possibly just GitHub wiki long-term.
 
+## The session cycle is a product (2026-07-17 close-out)
+
+Start session → interview → plan/implement/iterate (any order) →
+retro/handoff → HUMAN GAP → next session. The gap is load-bearing:
+(1) compaction degrades in-session memory — critical details lost,
+agents hallucinate; clean sessions beat one compacted one. (2) No
+active session FORCES the human dev steps: read the code yourself,
+test it yourself, write durable repo notes (not chat), be critical,
+ponder architecture with time (even the session-limit reset is
+thinking time). Ship this cycle as cortex tooling — pairs with
+memory-folding and a handoff-prompt agent.
+
+## Agents ship with deterministic backbones, or not at all (2026-07-17)
+
+Never ship an agent that is only agent.md + skill files. Every shipped
+agent gets real code with true logical outputs the agent runs without
+the human re-explaining (brickwall is the model). A prompt-builder
+agent needs a prompt registry/catalog updated per generation, plus
+evals over template variants. Prove the agent beats not-using-it.
+Cortex is a real terminal-usable toolkit Ian could drive without AI;
+agents are the speed layer, not the substance.
+
+## Cross-repo is the norm, not the edge (2026-07-17)
+
+Ten years of jobs, every one required simultaneous commits across
+multiple branches of multiple repos (ui-1/ui-2, an api per ui,
+microservices per api, in-house design-library → component-lib → ui
+chains) plus reviewing teammates' branches in parallel; worktrees only
+arrived in the last year (via Claude). An orchestrator operating at
+Sites/*, one monorepo, or one subpackage must know WHICH docs and
+rules bind at its scope. Real spec territory.
+
+## Init as investigation (2026-07-17)
+
+The template file NAMES are not gospel. `cortex init` on a legacy repo
+could be an agent flow: interview + investigate the repo, discover
+existing fragmented docs already playing these roles, build only what
+is missing. Blank-vs-seeded templates should be a user choice on
+fresh repos.
+
 ## useful doc about current state of agentic coding
 
 /Users/ianrios/Sites/cortex/.ai/specs/The Great Flattening (x article).md

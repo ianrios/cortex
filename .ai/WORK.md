@@ -1,5 +1,9 @@
 Current focus:
 
+- NEXT SESSION: interview-first — read
+  .ai/plans/2026-07-18-interview-handoff.md before anything else;
+  Ian's own review lands in .ai/specs/current-state-review.md.
+
 - PHASES 2+3 DONE (2026-07-17): @ianrios/drift (portfolio validate.ts
   is the proof, 221911f); @ianrios/eslint-config + @ianrios/cortex
   (`cortex init`, scaffolding-only bin — ADR 0005; init self-test:
@@ -64,14 +68,11 @@ Open questions (dogfood friction = roadmap input; details in archived plans):
 - Per-repo Node engines bit both migrations — USAGE.md agent section
   should say "honor .nvmrc/engines before installing"
 
-Resolved 2026-07-16 (interview; details in session-beta plan): extend
-defaults NOT built — replace semantics documented, init writes resolved
-arrays; test-file escape from the pragma ban WILL close +
-testFilePatterns config (config-surface proposal); changelog cut over
-to packages/brickwall/CHANGELOG.md; portfolio's kept scripts confirmed
-intentional (Phase 2 userland).
+Resolved 2026-07-16 (details in archived session-beta plan): extend
+defaults NOT built; pragma-ban test escape closed; changelog cut over;
+portfolio's kept scripts intentional (became Phase 2 userland).
 
-Still to interview (round 2): .ai/ audience + cortex init UX,
-monorepo/multi-repo semantics, custom agents w/ scoped skills, file
-compression, AGENTS.md rigidity, arborist collab, branding, cleanup.md
-de-Ian-ing/README tone/legacy-doc deletion.
+Round-2 interview HELD at session close (2026-07-17): answers folded
+into ians-brain.md (4 new sections) + BACKLOG (7 new entries);
+cleanup.md consumed → completed/. Names all ratified. Doc count at
+25/25 with Ian's two working specs as visible exemption-debt.

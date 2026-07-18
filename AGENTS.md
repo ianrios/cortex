@@ -22,9 +22,12 @@ approval); phases inside an approved plan proceed autonomously.
 
 ## Quality gates
 
-Once Phase 1 lands: `pnpm check` (format → typecheck → lint → cortex's own
-budget checks) and `pnpm test` must pass. Passing gates is necessary, not
-sufficient — behavior gets verified by running the CLI against fixtures.
+Checks are a graduated chain, not one gate (Ian, 2026-07-17): diff-mode
+brickwall inside the agent loop (fast, scoped to the change), `--full`
+at commit/CI (strict), `--audit` for humans. `pnpm check` + `pnpm test`
+green before committing here; in adopter repos legacy debt burns down
+over time rather than blocking adoption. Passing gates is necessary,
+not sufficient — behavior gets verified by running the thing.
 
 ## Structure
 
