@@ -18,6 +18,7 @@
     ".changeset",
     ".claude",
     ".github",
-    "packages/brickwall/test/fixtures"
+    "packages/brickwall/test/fixtures",
+    "packages/cortex/templates"
   ]
 }

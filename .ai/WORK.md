@@ -1,11 +1,13 @@
 Current focus:
 
-- PHASE 2 DONE (2026-07-17): @ianrios/drift extracted, portfolio's
-  validate.ts migrated as first userland consumer (221911f), all
-  verdict paths verified live. ADR 0004. Plans archived to completed/.
+- PHASES 2+3 DONE (2026-07-17): @ianrios/drift (portfolio validate.ts
+  is the proof, 221911f); @ianrios/eslint-config + @ianrios/cortex
+  (`cortex init`, scaffolding-only bin — ADR 0005; init self-test:
+  fresh scaffold passes brickwall --full). "drift" name RATIFIED;
+  cortex/eslint-config names + ADR 0005 await Ian's veto.
 - Rev 4 config surface DONE + dogfooded: petal 4956a28, portfolio
-  2b3c1de, both PUSHED (Ian approved). NEXT: drive-repo dogfooding
-  (queue in .ai/specs/dogfood-queue.md), Phase 3 when Ian steers.
+  2b3c1de, both pushed. NEXT: drive-repo dogfood queue (standing
+  regression suite per Ian), then round-2 interview.
 - Deferred perf items (do with benchmark evidence): precompile selector
   normalization out of per-file hot loops; merge diff mode's duplicate
   ls-files spawn; audit-shield handling as effective-config.

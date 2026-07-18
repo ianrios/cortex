@@ -114,22 +114,19 @@ per-check error isolation, exit 0/1/2 — ADR 0004); portfolio's 13 checks
 migrated as the first userland consumer, all verdict paths verified live.
 Record: `.ai/completed/2026-07-17-phase-2-drift.md`.
 
-### Phase 3 — Repo baseline + scaffolder
+### Phase 3 — Repo baseline + scaffolder ✅ DONE (2026-07-17)
 
-Shareable ESLint strictTypeChecked flat config, prettier/knip presets,
-markdownlint config and coverage-floor guidance (petal's remaining gates),
-husky/lint-staged wiring, and `cortex init`: vendors the `.ai/` skeleton
-(CONTEXT/WORK/RULES/ANTI-PATTERNS/WORKFLOW/BUGS + plans/specs/completed)
-and AGENTS.md/CLAUDE.md starters. Honors the copy-then-edit rule —
-templates are real files copied in, never regenerated. Decide here whether
-an umbrella `cortex` bin owns `init`/`check`.
-
-Insights folded 2026-07-16 (design detail in
-`.ai/plans/2026-07-16-config-surface.md`; Ian's originals in
-`.ai/specs/ians-brain.md`): the eslint-disable ban generalizes to a
-per-language `bannedPragmas` list; budgets should be importable from
-existing lint configs; `cortex init` writes fully-resolved arrays into
-generated configs (array keys replace defaults — nothing invisible).
+`@ianrios/eslint-config` (generic strict core, projectService on) +
+`@ianrios/cortex` (`cortex init`: never-overwrite `.ai/` skeleton,
+AGENTS/CLAUDE pair, resolved brickwall config, gate starters; umbrella
+bin is scaffolding-only — ADR 0005). Named deviations from the original
+text: BACKLOG ships instead of WORKFLOW/BUGS (WORKFLOW is Phase 4
+material); prettier/markdownlint/knip ship as vendored TEMPLATES, not
+preset packages (repo-owned on landing — the volatility split applied);
+husky wiring documented, never automated. `bannedPragmas` and
+resolved-array init landed with Phase 1's rev 4. Still open from the
+original scope: budget-import from existing lint configs. Record:
+`.ai/completed/2026-07-17-phase-3-baseline-init.md`.
 
 ### Phase 4 — Agent workflow kit
 

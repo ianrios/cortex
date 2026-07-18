@@ -1,0 +1,64 @@
+{
+  "docs": {
+    "matches": [
+      {
+        "patterns": [
+          ".md"
+        ]
+      }
+    ],
+    "maxCount": 25,
+    "maxLines": 80,
+    "tiers": [
+      {
+        "dirs": [
+          ".ai/plans",
+          ".ai/specs",
+          "/docs"
+        ],
+        "maxLines": 280
+      }
+    ]
+  },
+  "code": {
+    "matches": [
+      {
+        "patterns": [
+          ".ts",
+          ".tsx",
+          ".js",
+          ".jsx"
+        ]
+      }
+    ],
+    "maxLines": 250,
+    "tiers": [],
+    "testFilePatterns": [
+      ".test.",
+      ".spec."
+    ]
+  },
+  "bannedPragmas": [
+    "eslint-disable"
+  ],
+  "ignoreDirs": [
+    "node_modules",
+    ".git",
+    "dist",
+    "build",
+    "coverage",
+    ".changeset",
+    ".claude",
+    ".github",
+    ".vscode",
+    ".codex",
+    ".cursor"
+  ],
+  "archiveDirs": [
+    ".ai/completed",
+    "docs/archive"
+  ],
+  "exemptFiles": [
+    "CHANGELOG.md"
+  ]
+}

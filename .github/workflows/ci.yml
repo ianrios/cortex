@@ -49,3 +49,4 @@ jobs:
           node --version
           node packages/brickwall/dist/cli.js --full
           node --input-type=module -e "const m = await import('./packages/drift/dist/index.js'); if (typeof m.runChecks !== 'function') process.exit(1); console.log('drift floor OK');"
+          node packages/cortex/dist/cli.js init --dir "$(mktemp -d)"
