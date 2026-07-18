@@ -55,8 +55,11 @@ Open questions (dogfood friction = roadmap input; details in archived plans):
   portfolio migration itself; migration docs should warn
 - Tarball-in-place updates need fresh add (integrity pins, both pms) —
   snapshot releases are the real fix
-- `pnpm add -w` transiently broke petal eslint type resolution until a
-  follow-up `pnpm install` — watch for recurrence
+- Sweep findings 2026-07-17: pragma ban has NO gradual-adoption path
+  (fix or `[]` only) — most legacy repos carry pragmas; a warn-mode is
+  a candidate, not designed. 4 of 7 repos' only doc violation was an
+  oversized README (~140 lines) — do defaults want a README tier?
+  Diff-mode is THE legacy onboarding recipe — promote in USAGE.
 - `--all` drowns in stale-artifact noise — BACKLOG janitor-agent evidence
 - Per-repo Node engines bit both migrations — USAGE.md agent section
   should say "honor .nvmrc/engines before installing"

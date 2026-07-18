@@ -13,8 +13,13 @@ enters this repo; findings come back generically.
   re-migrated to the rev 4 config surface 2026-07-17 (local commits,
   gates + break-tests green, lint gates run --full).
 - Two NDA production repos surveyed + benchmarked (2026-07-17): 31k-file
-  non-git monolith 4.1s full run; 2k-file git repo 0.9s. See the
-  config-surface plan's scale-facts section.
+  non-git monolith 4.1s full run; 2k-file git repo 0.9s.
+- STANDING-SUITE first sweep (2026-07-17): 7 NDA repos ran rev 4
+  defaults (results on the drive tracker). One repo proved the
+  diff-mode adoption story on real history (red --full, clean diff vs
+  recent commits); one took a tuned config from 10 violations to 1
+  (the pragma — unexemptable by design); cortex init tested clean on a
+  real legacy repo. Re-run the sweep after every engine change.
 
 ## Public queue (Ian's repos — full migrations allowed)
 
