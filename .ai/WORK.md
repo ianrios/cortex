@@ -3,8 +3,9 @@ Current focus:
 - Config surface rev 4: FULLY RATIFIED (Ian, 2026-07-17; ADRs
   0001-0003) and IMPLEMENTED — selector grammar, diff-default CLI,
   bannedPragmas, 72 tests. Six-angle code review ran pre-commit; all
-  confirmed findings fixed (record in the commit). NEXT: dogfood
-  migrations (petal, portfolio) with fresh tarballs, then drive repos.
+  confirmed findings fixed (record in the commit). Dogfood repos
+  migrated to rev 4 (petal 4956a28, portfolio 2b3c1de — LOCAL commits,
+  push is Ian's call). NEXT: drive-repo dogfooding.
 - Deferred perf items (do with benchmark evidence): precompile selector
   normalization out of per-file hot loops; merge diff mode's duplicate
   ls-files spawn; audit-shield handling as effective-config.

@@ -9,7 +9,9 @@ enters this repo; findings come back generically.
 ## Done
 
 - petal (2026-07-15) and ianrios.github.io (2026-07-16) — full
-  migrations, archived plans hold the semantic-delta records.
+  migrations, archived plans hold the semantic-delta records; both
+  re-migrated to the rev 4 config surface 2026-07-17 (local commits,
+  gates + break-tests green, lint gates run --full).
 - Two NDA production repos surveyed + benchmarked (2026-07-17): 31k-file
   non-git monolith 4.1s full run; 2k-file git repo 0.9s. See the
   config-surface plan's scale-facts section.
