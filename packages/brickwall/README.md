@@ -5,72 +5,74 @@ so agents never clip. Zero runtime dependencies. ESM-only. Node >= 20.
 
 ## What it checks
 
-- `md-count` — total `.md` files (excluding `archiveDirs`/`exemptFiles`)
-  stays under `budgets.mdFileCount`.
-- `doc-size` — each `.md` file stays under `budgets.mdLines`, or
-  `budgets.storyLines` under a `storyDirs` prefix.
-- `code-size` — each code file (by `codeExtensions`, excluding `*.test.*` /
-  `*.spec.*` and `exemptFiles`) stays under `budgets.codeLines`.
-- `eslint-disable` — no `eslint-disable` comment in any code file (when
-  `banEslintDisable` is true). Naive line regex: prose mentions flag too,
-  deliberately. `exemptFiles` does NOT escape this ban; `archiveDirs` do.
+- `doc-count` — total doc files stays under `docs.maxCount`.
+- `doc-size` / `code-size` — each file stays under its section's
+  `maxLines`, or a matching tier's. Test files (`code.testFilePatterns`,
+  naive path substrings) skip the size cap ONLY.
+- `banned-pragma` — no `bannedPragmas` substring on any line of any code
+  file — tests and `exemptFiles` included; only `archiveDirs` escape.
+  No comment parsing: prose mentions flag deliberately. Keep pragma-
+  bearing test data in fixture files under an ignored dir, never inline.
 
 ## Config
 
-Looked up at the cwd: `brickwall.config.json` or a `"brickwall"` key in
-`package.json`. Both at once, or any unknown key, is a config error. No
-config at all uses the defaults below. Array keys REPLACE their default
-lists when set — they never extend them (setting `storyDirs` discards
-the default entries); `budgets` merges per key over the defaults.
+`brickwall.config.json` or a `"brickwall"` package.json key (not both).
+Groups merge per key; ARRAYS REPLACE their defaults wholesale. One
+selector grammar everywhere: `{ dirs?, patterns? }` — ANY entry within a
+field, ALL present fields must match. Bare `.md` ≡ `*.md` (basename
+suffix); dir entries: bare name = any depth, slash = root prefix,
+leading `/` root-anchors. `matches` decides section membership (a
+`dirs` claim beats patterns-only; deeper dir wins; ties error loudly).
+`tiers` = selector + `maxLines`, first match in config order wins.
 
 ```jsonc
 {
-  "budgets": {
-    "mdFileCount": 25,
-    "mdLines": 80,
-    "storyLines": 280,
-    // A number caps all extensions; a map must cover every configured one.
-    "codeLines": 250 // or { ".ts": 250, ".scss": 600 }
+  "docs": {
+    "matches": [{ "patterns": [".md"] }],
+    "maxCount": 25,
+    "maxLines": 80,
+    "tiers": [
+      { "dirs": [".ai/plans", ".ai/specs", "/docs"], "maxLines": 280 }
+    ]
   },
-  "storyDirs": [".ai/plans", ".ai/specs", "docs"],
-  // Excluded from ALL checks and the md-count — the archival escape valve.
+  "code": {
+    "matches": [{ "patterns": [".ts", ".tsx", ".js", ".jsx"] }],
+    "maxLines": 250,
+    "tiers": [],
+    "testFilePatterns": [".test.", ".spec."]
+  },
+  "bannedPragmas": ["eslint-disable"],
   "archiveDirs": [".ai/completed", "docs/archive"],
-  // Excluded from md-count/doc-size/code-size, by basename or exact path.
-  // Custom entries WARN as exemption debt; these defaults stay silent.
   "exemptFiles": ["CHANGELOG.md"],
-  // Never walked at all.
-  "ignoreDirs": [
-    "node_modules", ".git", "dist", "build", "coverage",
-    ".changeset", ".claude", ".github", ".vscode", ".codex", ".cursor"
-  ],
-  "codeExtensions": [".ts", ".tsx", ".js", ".jsx"],
-  "banEslintDisable": true
+  "ignoreDirs": ["node_modules", ".git", "dist", "build", "coverage",
+    ".changeset", ".claude", ".github", ".vscode", ".codex", ".cursor"]
 }
 ```
+
+Example configs (three, from real repos): see `docs/USAGE.md` in the
+cortex repo.
 
 ## CLI
 
 ```bash
-brickwall            # human output; ✅/❌ verdict then ⚠ warnings, to stderr
-brickwall --json     # {"violations":[...],"warnings":[...]} to stdout
-brickwall --all      # full-scope audit (below)
+brickwall                 # DIFF mode: content checks on changed files only
+brickwall --base main     # diff vs a ref (default HEAD)
+brickwall --full          # read and check everything — use this in CI/hooks
+brickwall --audit         # shields-off fs walk; audit view, NOT a gate
+brickwall --json          # {"violations":[...],"warnings":[...],"mode":"..."}
 brickwall --config path/to/brickwall.config.json
 ```
 
-Exit codes: `0` no violations, `1` violations found, `2` config or usage
-error. Warnings NEVER affect the exit code. `--json` is the stable machine
-surface: `{ violations, warnings }` — violations `{ type, message, file? }`,
-warnings `{ type, message }` in config-entry order: `exemption-debt` (a
-custom `exemptFiles` entry shields ≥1 scanned file; every match enumerated)
-or `stale-exemption` (matches nothing).
-
-`--all` is an audit view for humans/agents, NOT a CI gate: an fs walk
-skipping ONLY `node_modules` and `.git`, with `ignoreDirs`/`archiveDirs`/
-`exemptFiles` disabled. Build output and test fixtures WILL fire.
+Exit codes: `0` pass, `1` violations, `2` config or usage error. Doc
+COUNT and all warnings (`exemption-debt`, `stale-exemption`,
+`stale-tier`) are path-only and repo-wide in every mode. A bare
+`brickwall` in CI is vacuously green (nothing changed vs HEAD) — CI and
+git hooks must say `--full`. Outside git, diff falls back to `--full`
+with a note. Warnings NEVER affect the exit code.
 
 ## Programmatic use
 
 ```ts
 import { run } from '@ianrios/brickwall';
-const { violations, warnings, config } = run({ cwd: process.cwd() });
+const { violations, warnings, mode, config } = run({ cwd: process.cwd() });
 ```

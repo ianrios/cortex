@@ -1,32 +1,48 @@
 import { readFileSync } from 'node:fs';
-import { extname, join } from 'node:path';
-import { DEFAULT_CONFIG, loadConfig, type BrickwallConfig } from './config.js';
-import { walk, walkAll } from './walk.js';
+import { join } from 'node:path';
 import {
+  BrickwallConfigError,
+  DEFAULT_CONFIG,
+  loadConfig,
+  type BrickwallConfig,
+} from './config.js';
+import { gitChangedFiles, walk, walkAll } from './walk.js';
+import { classify } from './match.js';
+import {
+  checkBannedPragmas,
   checkCodeSize,
+  checkDocCount,
   checkDocSize,
-  checkEslintDisable,
   checkExemptionDebt,
-  checkMdCount,
-  isExempt,
-  isTestFile,
+  checkStaleTiers,
+  isArchived,
+  isExemptFile,
   type FileContent,
   type Violation,
   type Warning,
 } from './checks.js';
 
+export type RunMode = 'diff' | 'full' | 'audit';
+
 export interface RunOptions {
   cwd?: string;
   configPath?: string;
-  /** Full-scope audit: fs walk skipping only node_modules and .git;
-   *  archiveDirs and exemptFiles are disabled too. Exit semantics unchanged. */
-  all?: boolean;
+  /** Default 'diff': content checks restrict to files changed vs `base`;
+   *  path-only checks (doc count, warnings) are ALWAYS repo-wide.
+   *  'full' reads everything. 'audit' is the shields-off fs walk
+   *  (ignore/archive/exempt lists disabled; exit semantics unchanged). */
+  mode?: RunMode;
+  /** Diff base ref, default 'HEAD' (staged + unstaged + untracked). */
+  base?: string;
 }
 
 export interface RunResult {
   config: BrickwallConfig;
   violations: Violation[];
   warnings: Warning[];
+  /** The mode that actually ran (diff falls back to full outside git). */
+  mode: RunMode;
+  note?: string;
 }
 
 function readAll(cwd: string, files: string[]): FileContent[] {
@@ -36,43 +52,114 @@ function readAll(cwd: string, files: string[]): FileContent[] {
   }));
 }
 
-/** Orchestrates: load config, walk the repo, read files, run every check. */
+/** Orchestrates: load config, walk, classify, pick the content set for the
+ *  mode, run every check. Path-only checks always see the whole walk. */
 export function run(options: RunOptions = {}): RunResult {
   const cwd = options.cwd ?? process.cwd();
   const config = loadConfig(cwd, options.configPath);
-  const allFiles = options.all ? walkAll(cwd) : walk(cwd, config.ignoreDirs);
+  const audit = options.mode === 'audit';
 
-  // --all disables the archive/exempt lists entirely (which also empties the
-  // warnings channel: with nothing exempted there is no exemption debt).
-  const archiveDirs = options.all ? [] : config.archiveDirs;
-  const exemptFiles = options.all ? [] : config.exemptFiles;
+  const allFiles = audit ? walkAll(cwd) : walk(cwd, config.ignoreDirs);
+  // --audit disables the archive/exempt lists entirely (which also empties
+  // the exemption-debt channel: with nothing exempted there is no debt).
+  const archiveDirs = audit ? [] : config.archiveDirs;
+  const exemptFiles = audit ? [] : config.exemptFiles;
 
-  const mdFiles = allFiles.filter((f) => f.endsWith('.md'));
-  const codeFiles = allFiles.filter(
-    (f) => config.codeExtensions.includes(extname(f)) && !isTestFile(f),
+  // Archive filtering runs BEFORE classification: archived files are outside
+  // every check, including the cross-section double-claim error.
+  const active = allFiles.filter((f) => !isArchived(f, archiveDirs));
+
+  const docFiles: string[] = [];
+  const codeFiles: string[] = [];
+  const ambiguous: string[] = [];
+  for (const file of active) {
+    switch (classify(file, config.docs.matches, config.code.matches)) {
+      case 'docs':
+        docFiles.push(file);
+        break;
+      case 'code':
+        codeFiles.push(file);
+        break;
+      case 'ambiguous':
+        ambiguous.push(file);
+        break;
+      case 'none':
+        break;
+    }
+  }
+  if (ambiguous.length > 0) {
+    const shown = ambiguous.slice(0, 5).join(', ');
+    const more = ambiguous.length > 5 ? ` (+${ambiguous.length - 5} more)` : '';
+    throw new BrickwallConfigError(
+      `brickwall config: docs.matches and code.matches both claim: ${shown}${more} ` +
+        `— make one selector more specific (a "dirs" claim beats patterns-only).`,
+    );
+  }
+
+  // Resolve the content set for the mode.
+  let mode: RunMode = options.mode ?? 'diff';
+  let note: string | undefined;
+  let contentDocs = docFiles;
+  let contentCode = codeFiles;
+  if (mode === 'diff') {
+    const changed = gitChangedFiles(cwd, options.base ?? 'HEAD');
+    if (changed === undefined) {
+      // Silent fallback is only for the implicit default. An EXPLICIT base
+      // that fails (typo, shallow clone missing the ref) is a user error —
+      // swapping in a full scan would change what the gate means.
+      if (options.base !== undefined) {
+        throw new BrickwallConfigError(
+          `brickwall: --base "${options.base}" could not be resolved ` +
+            `(not a git work tree, unknown ref, or ref not fetched)`,
+        );
+      }
+      mode = 'full';
+      note = 'diff mode needs a git work tree and resolvable base; ran --full instead';
+    } else {
+      const changedSet = new Set(changed);
+      contentDocs = docFiles.filter((f) => changedSet.has(f));
+      contentCode = codeFiles.filter((f) => changedSet.has(f));
+    }
+  }
+
+  // Exempt docs are never checked, so never read them. Exempt CODE must
+  // still be read: the pragma scan deliberately covers it.
+  const docContents = readAll(
+    cwd,
+    contentDocs.filter((f) => !isExemptFile(f, exemptFiles)),
   );
-
-  const mdContents = readAll(cwd, mdFiles);
-  const codeContents = readAll(cwd, codeFiles);
+  const codeContents = readAll(cwd, contentCode);
+  const notExempt = ({ path }: FileContent): boolean =>
+    !isExemptFile(path, exemptFiles);
 
   const violations: Violation[] = [
-    ...checkMdCount(mdFiles, archiveDirs, exemptFiles, config.budgets.mdFileCount),
-    ...checkDocSize(mdContents, config.storyDirs, archiveDirs, exemptFiles, config.budgets),
-    ...checkCodeSize(codeContents, archiveDirs, exemptFiles, config.budgets.codeLines),
-    ...(config.banEslintDisable
-      ? checkEslintDisable(codeContents, archiveDirs)
-      : []),
+    // Path-only, always repo-wide.
+    checkDocCount(
+      docFiles.filter((f) => !isExemptFile(f, exemptFiles)),
+      config.docs.maxCount,
+    ),
+    checkDocSize(docContents, config.docs.tiers, config.docs.maxLines),
+    checkCodeSize(
+      codeContents.filter(notExempt),
+      config.code.tiers,
+      config.code.maxLines,
+      config.code.testFilePatterns,
+    ),
+    // exemptFiles and test files do NOT escape the pragma scan.
+    checkBannedPragmas(codeContents, config.bannedPragmas),
+  ].flat();
+
+  // Warnings are path-only and repo-wide in EVERY mode — a diff run must
+  // never fake stale-exemption/stale-tier signals from a partial view.
+  const warnings: Warning[] = [
+    ...checkExemptionDebt(
+      [...docFiles, ...codeFiles],
+      exemptFiles,
+      DEFAULT_CONFIG.exemptFiles,
+    ),
+    ...checkStaleTiers('docs', config.docs.tiers, docFiles, DEFAULT_CONFIG.docs.tiers),
+    ...checkStaleTiers('code', config.code.tiers, codeFiles, DEFAULT_CONFIG.code.tiers),
   ];
 
-  // Warning scan set: md ∪ code files as the checks see them, minus archives.
-  const scanned = [...mdFiles, ...codeFiles].filter(
-    (f) => !isExempt(f, archiveDirs),
-  );
-  const warnings = checkExemptionDebt(
-    scanned,
-    exemptFiles,
-    DEFAULT_CONFIG.exemptFiles,
-  );
-
-  return { config, violations, warnings };
+  return { config, violations, warnings, mode, note };
 }

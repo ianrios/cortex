@@ -1,311 +1,167 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  checkBannedPragmas,
   checkCodeSize,
+  checkDocCount,
   checkDocSize,
-  checkEslintDisable,
   checkExemptionDebt,
-  checkMdCount,
+  checkStaleTiers,
   countLines,
-  isExempt,
+  isArchived,
   isExemptFile,
   isTestFile,
-  resolveCodeLimit,
-  resolveDocTier,
 } from '../src/checks.js';
+import { DEFAULT_CONFIG } from '../src/config.js';
+
+// Pragma-bearing test DATA lives in fixture files, never inline in source
+// (the scan runs on this repo's own tests). The pragma VALUE comes from the
+// defaults JSON for the same reason.
+const PRAGMA = DEFAULT_CONFIG.bannedPragmas[0]!;
+const pragmaSample = readFileSync(
+  new URL('./fixtures/pragmas/sample-code.txt', import.meta.url),
+  'utf-8',
+);
 
 describe('countLines', () => {
-  it('does not count a trailing final newline as an extra line', () => {
-    expect(countLines('a\nb\nc\n')).toBe(3);
-    expect(countLines('a\nb\nc')).toBe(3);
-  });
-
-  it('handles an empty string', () => {
+  it('does not count a trailing newline as an extra line', () => {
+    expect(countLines('a\nb\n')).toBe(2);
+    expect(countLines('a\nb')).toBe(2);
+    // Edge behaviors every budget check depends on — do not "simplify" away:
+    // an empty file is one (empty) line; blank lines count.
     expect(countLines('')).toBe(1);
-  });
-
-  it('handles a single line without newline', () => {
-    expect(countLines('one line')).toBe(1);
-  });
-
-  it('handles multiple trailing newlines', () => {
     expect(countLines('a\nb\n\n')).toBe(3);
   });
 });
 
-describe('isExempt / resolveDocTier (tier resolution)', () => {
-  const storyDirs = ['.ai/plans', '.ai/specs', 'docs'];
-  const archiveDirs = ['.ai/completed', 'docs/archive'];
-
-  it('recognizes files under an archive dir', () => {
-    expect(isExempt('.ai/completed/foo.md', archiveDirs)).toBe(true);
-    expect(isExempt('docs/archive/old.md', archiveDirs)).toBe(true);
-  });
-
-  it('does not match files merely prefixed by the dir name', () => {
-    expect(isExempt('docs/archived-notes.md', archiveDirs)).toBe(false);
-    expect(isExempt('.ai/completedish.md', archiveDirs)).toBe(false);
-  });
-
-  it('resolves story tier for files under storyDirs', () => {
-    expect(resolveDocTier('docs/EXTRACTION_PLAN.md', storyDirs)).toBe('story');
-    expect(resolveDocTier('.ai/plans/phase1.md', storyDirs)).toBe('story');
-  });
-
-  it('resolves default tier for files outside storyDirs', () => {
-    expect(resolveDocTier('README.md', storyDirs)).toBe('default');
-    expect(resolveDocTier('.ai/RULES.md', storyDirs)).toBe('default');
-  });
-
-  it('normalizes backslash-form config dirs to posix before comparing', () => {
-    expect(isExempt('docs/archive/old.md', ['docs\\archive'])).toBe(true);
-    expect(resolveDocTier('docs/plan.md', ['docs\\'])).toBe('story');
+describe('isArchived', () => {
+  it('uses the one dir grammar: slash entries root-anchor, bare names any depth', () => {
+    expect(isArchived('.ai/completed/x.md', ['.ai/completed'])).toBe(true);
+    expect(isArchived('sub/.ai/completed/x.md', ['.ai/completed'])).toBe(false);
+    expect(isArchived('sub/archive/x.md', ['archive'])).toBe(true);
+    expect(isArchived('docs/x.md', ['/docs'])).toBe(true);
+    expect(isArchived('packages/a/docs/x.md', ['/docs'])).toBe(false);
   });
 });
 
 describe('isExemptFile', () => {
-  it('matches by exact relative path', () => {
+  it('matches by exact relative path or basename', () => {
     expect(isExemptFile('CHANGELOG.md', ['CHANGELOG.md'])).toBe(true);
-  });
-
-  it('matches by basename at any depth', () => {
-    expect(isExemptFile('packages/brickwall/CHANGELOG.md', ['CHANGELOG.md'])).toBe(
-      true,
-    );
-  });
-
-  it('does not match unrelated files', () => {
-    expect(isExemptFile('README.md', ['CHANGELOG.md'])).toBe(false);
+    expect(isExemptFile('packages/x/CHANGELOG.md', ['CHANGELOG.md'])).toBe(true);
+    expect(isExemptFile('src/data.ts', ['src/data.ts'])).toBe(true);
+    expect(isExemptFile('other/data.ts', ['src/data.ts'])).toBe(false);
   });
 });
 
 describe('isTestFile', () => {
-  it('matches .test. and .spec. files', () => {
-    expect(isTestFile('src/foo.test.ts')).toBe(true);
-    expect(isTestFile('src/foo.spec.tsx')).toBe(true);
-  });
-
-  it('does not match ordinary files', () => {
-    expect(isTestFile('src/foo.ts')).toBe(false);
-    expect(isTestFile('src/testing.ts')).toBe(false);
+  it('is configurable naive substring matching', () => {
+    expect(isTestFile('src/a.test.ts', ['.test.', '.spec.'])).toBe(true);
+    expect(isTestFile('tests/test_walk.py', ['test_'])).toBe(true);
+    expect(isTestFile('src/a.ts', ['.test.'])).toBe(false);
   });
 });
 
-describe('resolveCodeLimit', () => {
-  it('applies a plain number to every file', () => {
-    expect(resolveCodeLimit('src/a.ts', 250)).toBe(250);
-    expect(resolveCodeLimit('src/a.scss', 250)).toBe(250);
-  });
-
-  it('looks up the extension in a per-extension map', () => {
-    const map = { '.ts': 250, '.scss': 600 };
-    expect(resolveCodeLimit('src/a.ts', map)).toBe(250);
-    expect(resolveCodeLimit('src/a.scss', map)).toBe(600);
-  });
-
-  it('throws when the extension is missing from the map', () => {
-    expect(() => resolveCodeLimit('src/a.jsx', { '.ts': 250 })).toThrow(
-      /no code-size budget/,
-    );
+describe('checkDocCount', () => {
+  it('flags only when over the limit', () => {
+    expect(checkDocCount(['a.md', 'b.md'], 2)).toEqual([]);
+    const violations = checkDocCount(['a.md', 'b.md', 'c.md'], 2);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toMatchObject({ type: 'doc-count' });
+    expect(violations[0]!.message).toContain('3 (max 2)');
   });
 });
 
-describe('checkMdCount', () => {
-  it('passes exactly at the limit', () => {
-    const files = Array.from({ length: 5 }, (_, i) => `f${i}.md`);
-    expect(checkMdCount(files, [], [], 5)).toEqual([]);
-  });
+describe('checkDocSize / checkCodeSize with tiers', () => {
+  const tiers = [{ dirs: ['.ai/plans'], maxLines: 5 }];
 
-  it('fails one over the limit', () => {
-    const files = Array.from({ length: 6 }, (_, i) => `f${i}.md`);
-    const violations = checkMdCount(files, [], [], 5);
-    expect(violations).toHaveLength(1);
-    expect(violations[0]?.type).toBe('md-count');
-  });
-
-  it('excludes archive-dir files from the count', () => {
-    const files = ['a.md', 'b.md', '.ai/completed/c.md', '.ai/completed/d.md'];
-    expect(checkMdCount(files, ['.ai/completed'], [], 2)).toEqual([]);
-  });
-
-  it('excludes exempt files (e.g. CHANGELOG.md) from the count', () => {
-    const files = ['a.md', 'b.md', 'CHANGELOG.md'];
-    expect(checkMdCount(files, [], ['CHANGELOG.md'], 2)).toEqual([]);
-  });
-});
-
-describe('checkDocSize', () => {
-  const budgets = { mdLines: 3, storyLines: 5 };
-
-  function makeContent(lines: number): string {
-    return Array.from({ length: lines }, (_, i) => `line ${i}`).join('\n');
-  }
-
-  it('passes exactly at the default-tier limit', () => {
-    const files = [{ path: 'README.md', content: makeContent(3) }];
-    expect(checkDocSize(files, [], [], [], budgets)).toEqual([]);
-  });
-
-  it('fails one over the default-tier limit', () => {
-    const files = [{ path: 'README.md', content: makeContent(4) }];
-    const violations = checkDocSize(files, [], [], [], budgets);
-    expect(violations).toHaveLength(1);
-    expect(violations[0]?.type).toBe('doc-size');
-  });
-
-  it('passes exactly at the story-tier limit', () => {
-    const files = [{ path: 'docs/plan.md', content: makeContent(5) }];
-    expect(checkDocSize(files, ['docs'], [], [], budgets)).toEqual([]);
-  });
-
-  it('fails one over the story-tier limit', () => {
-    const files = [{ path: 'docs/plan.md', content: makeContent(6) }];
-    const violations = checkDocSize(files, ['docs'], [], [], budgets);
-    expect(violations).toHaveLength(1);
-  });
-
-  it('skips archive-dir files entirely, even over budget', () => {
-    const files = [{ path: 'docs/archive/huge.md', content: makeContent(999) }];
-    expect(checkDocSize(files, ['docs'], ['docs/archive'], [], budgets)).toEqual([]);
-  });
-
-  it('skips exempt files (e.g. CHANGELOG.md) entirely, even over budget', () => {
-    const files = [{ path: 'CHANGELOG.md', content: makeContent(999) }];
-    expect(checkDocSize(files, [], [], ['CHANGELOG.md'], budgets)).toEqual([]);
-  });
-});
-
-describe('checkCodeSize', () => {
-  function makeContent(lines: number): string {
-    return Array.from({ length: lines }, (_, i) => `const x${i} = ${i};`).join(
-      '\n',
-    );
-  }
-
-  it('passes exactly at the limit', () => {
-    const files = [{ path: 'src/a.ts', content: makeContent(10) }];
-    expect(checkCodeSize(files, [], [], 10)).toEqual([]);
-  });
-
-  it('fails one over the limit', () => {
-    const files = [{ path: 'src/a.ts', content: makeContent(11) }];
-    const violations = checkCodeSize(files, [], [], 10);
-    expect(violations).toHaveLength(1);
-    expect(violations[0]?.type).toBe('code-size');
-  });
-
-  it('exempts test files', () => {
-    const files = [{ path: 'src/a.test.ts', content: makeContent(999) }];
-    expect(checkCodeSize(files, [], [], 10)).toEqual([]);
-  });
-
-  it('exempts files under archiveDirs', () => {
-    const files = [{ path: 'vendor/big.ts', content: makeContent(999) }];
-    expect(checkCodeSize(files, ['vendor'], [], 10)).toEqual([]);
-  });
-
-  it('applies a per-extension budget map', () => {
+  it('applies the first matching tier, else the section default', () => {
     const files = [
-      { path: 'src/a.ts', content: makeContent(10) },
-      { path: 'src/a.scss', content: makeContent(20) },
+      { path: '.ai/plans/p.md', content: 'x\n'.repeat(4) },
+      { path: 'README.md', content: 'x\n'.repeat(4) },
     ];
-    const map = { '.ts': 10, '.scss': 20 };
-    expect(checkCodeSize(files, [], [], map)).toEqual([]);
-    const violations = checkCodeSize(
-      [{ path: 'src/a.scss', content: makeContent(21) }],
-      [],
-      [],
-      map,
-    );
+    const violations = checkDocSize(files, tiers, 2);
     expect(violations).toHaveLength(1);
+    expect(violations[0]).toMatchObject({ type: 'doc-size', file: 'README.md' });
+    expect(violations[0]!.message).toContain('(max 2)');
   });
 
-  it('skips exemptFiles-matched files entirely, even over budget', () => {
-    const files = [{ path: 'src/manifest.ts', content: makeContent(999) }];
-    expect(checkCodeSize(files, [], ['manifest.ts'], 10)).toEqual([]);
+  it('code: test files skip the size cap only', () => {
+    const files = [
+      { path: 'src/big.test.ts', content: 'x\n'.repeat(10) },
+      { path: 'src/big.ts', content: 'x\n'.repeat(10) },
+    ];
+    const violations = checkCodeSize(files, [], 3, ['.test.']);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]!.file).toBe('src/big.ts');
+  });
+
+  it('code tiers: scss 600 over ts 250 (the portfolio case)', () => {
+    const scssTiers = [{ patterns: ['.scss'], maxLines: 3 }];
+    const files = [
+      { path: 'src/a.scss', content: 'x\n'.repeat(2) },
+      { path: 'src/b.ts', content: 'x\n'.repeat(2) },
+    ];
+    expect(checkCodeSize(files, scssTiers, 1, [])).toMatchObject([
+      { type: 'code-size', file: 'src/b.ts' },
+    ]);
   });
 });
 
-describe('checkEslintDisable', () => {
-  it('matches // form', () => {
-    const files = [{ path: 'src/a.ts', content: '// eslint-disable-next-line' }];
-    const violations = checkEslintDisable(files, []);
-    expect(violations).toHaveLength(1);
-    expect(violations[0]?.type).toBe('eslint-disable');
-  });
-
-  it('matches /* */ form', () => {
-    const files = [{ path: 'src/a.ts', content: '/* eslint-disable */' }];
-    expect(checkEslintDisable(files, [])).toHaveLength(1);
-  });
-
-  it('does not match ordinary code', () => {
-    const files = [{ path: 'src/a.ts', content: 'const x = 1;' }];
-    expect(checkEslintDisable(files, [])).toEqual([]);
-  });
-
-  it('flags prose comments too — a deliberate, source-matching false positive', () => {
+describe('checkBannedPragmas', () => {
+  it('flags every line containing a banned substring, tests included', () => {
     const files = [
-      { path: 'src/a.ts', content: '// eslint-disable is banned here' },
+      { path: 'src/a.test.ts', content: pragmaSample },
+      { path: 'src/clean.ts', content: 'const ok = 1;\n' },
     ];
-    expect(checkEslintDisable(files, [])).toHaveLength(1);
+    const violations = checkBannedPragmas(files, [PRAGMA]);
+    expect(violations).toHaveLength(2);
+    expect(violations[0]).toMatchObject({ type: 'banned-pragma', file: 'src/a.test.ts' });
+    expect(violations[0]!.message).toContain(':2 -');
+    expect(violations[1]!.message).toContain(':3 -');
   });
 
-  it('reports the correct line number', () => {
-    const files = [
-      { path: 'src/a.ts', content: 'const x = 1;\n// eslint-disable-line' },
-    ];
-    const violations = checkEslintDisable(files, []);
-    expect(violations[0]?.message).toContain('src/a.ts:2');
-  });
-
-  it('skips exempt files', () => {
-    const files = [
-      { path: 'vendor/a.ts', content: '// eslint-disable-next-line' },
-    ];
-    expect(checkEslintDisable(files, ['vendor'])).toEqual([]);
+  it('an empty pragma list visibly disables the scan', () => {
+    expect(
+      checkBannedPragmas([{ path: 'a.ts', content: pragmaSample }], []),
+    ).toEqual([]);
   });
 });
 
 describe('checkExemptionDebt', () => {
-  const defaults = ['CHANGELOG.md'];
+  it('warns debt for matching custom entries, stale for dead ones, silent for defaults', () => {
+    const warnings = checkExemptionDebt(
+      ['src/data.ts', 'CHANGELOG.md'],
+      ['src/data.ts', 'gone.ts', 'CHANGELOG.md'],
+      ['CHANGELOG.md'],
+    );
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toMatchObject({ type: 'exemption-debt' });
+    expect(warnings[0]!.message).toContain('src/data.ts');
+    expect(warnings[1]).toMatchObject({ type: 'stale-exemption' });
+    expect(warnings[1]!.message).toContain('gone.ts');
+  });
+});
 
-  it('emits one exemption-debt warning enumerating EVERY basename match', () => {
-    const scanned = ['data.ts', 'src/data.ts', 'packages/x/data.ts', 'src/a.ts'];
-    const warnings = checkExemptionDebt(scanned, ['data.ts'], defaults);
-    expect(warnings).toEqual([
-      {
-        type: 'exemption-debt',
-        message:
-          'exemptFiles "data.ts" exempts 3 file(s): ' +
-          'data.ts, src/data.ts, packages/x/data.ts',
-      },
-    ]);
+describe('checkStaleTiers', () => {
+  it('warns for custom tiers matching nothing, including fully-shadowed ones', () => {
+    const tiers = [
+      { patterns: ['.scss'], maxLines: 600 },
+      { dirs: ['src'], patterns: ['.scss'], maxLines: 300 },
+    ];
+    // The dir-scoped tier is listed AFTER the broad one, so it can never win.
+    const warnings = checkStaleTiers('code', tiers, ['src/a.scss'], []);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({ type: 'stale-tier' });
+    expect(warnings[0]!.message).toContain('code.tiers[1]');
   });
 
-  it('emits a stale-exemption warning for an entry matching nothing', () => {
-    const warnings = checkExemptionDebt(['README.md'], ['ghost.md'], defaults);
-    expect(warnings).toEqual([
-      {
-        type: 'stale-exemption',
-        message: 'exemptFiles "ghost.md" matches no scanned file',
-      },
-    ]);
-  });
-
-  it('keeps default entries silent whether they match or not', () => {
-    expect(checkExemptionDebt(['CHANGELOG.md'], defaults, defaults)).toEqual([]);
-    expect(checkExemptionDebt(['README.md'], defaults, defaults)).toEqual([]);
-  });
-
-  it('orders warnings by config-entry order', () => {
-    const scanned = ['b.md', 'a.md'];
-    const warnings = checkExemptionDebt(scanned, ['a.md', 'ghost.md', 'b.md'], defaults);
-    expect(warnings.map((w) => w.type)).toEqual([
-      'exemption-debt',
-      'stale-exemption',
-      'exemption-debt',
-    ]);
-    expect(warnings[0]?.message).toContain('"a.md"');
-    expect(warnings[2]?.message).toContain('"b.md"');
+  it('default tiers stay silent even when they match nothing', () => {
+    const warnings = checkStaleTiers(
+      'docs',
+      DEFAULT_CONFIG.docs.tiers,
+      ['README.md'],
+      DEFAULT_CONFIG.docs.tiers,
+    );
+    expect(warnings).toEqual([]);
   });
 });

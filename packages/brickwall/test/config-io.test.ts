@@ -30,20 +30,20 @@ describe('findConfigSource / loadConfig (IO)', () => {
     dir = makeTmpDir();
     writeFileSync(
       join(dir, 'brickwall.config.json'),
-      JSON.stringify({ budgets: { mdLines: 42 } }),
+      JSON.stringify({ docs: { maxLines: 42 } }),
     );
     const config = loadConfig(dir);
-    expect(config.budgets.mdLines).toBe(42);
+    expect(config.docs.maxLines).toBe(42);
   });
 
   it('reads a "brickwall" key from package.json when present', () => {
     dir = makeTmpDir();
     writeFileSync(
       join(dir, 'package.json'),
-      JSON.stringify({ name: 'x', brickwall: { budgets: { mdLines: 7 } } }),
+      JSON.stringify({ name: 'x', brickwall: { docs: { maxLines: 7 } } }),
     );
     const config = loadConfig(dir);
-    expect(config.budgets.mdLines).toBe(7);
+    expect(config.docs.maxLines).toBe(7);
   });
 
   it('throws when both brickwall.config.json and package.json "brickwall" key exist', () => {

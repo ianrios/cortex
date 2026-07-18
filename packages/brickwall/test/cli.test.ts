@@ -1,158 +1,80 @@
 import { describe, expect, it } from 'vitest';
 import { CliUsageError, formatResult, parseArgs } from '../src/cli.js';
-import type { Violation, Warning } from '../src/checks.js';
 
 describe('parseArgs', () => {
-  it('parses no flags', () => {
+  it('defaults to diff mode with no flags', () => {
     expect(parseArgs([])).toEqual({
       json: false,
-      all: false,
+      mode: 'diff',
+      base: undefined,
       configPath: undefined,
     });
   });
 
-  it('parses --json', () => {
-    expect(parseArgs(['--json'])).toEqual({
-      json: true,
-      all: false,
-      configPath: undefined,
-    });
+  it('parses --full, --audit, --json, --base, --config', () => {
+    expect(parseArgs(['--full']).mode).toBe('full');
+    expect(parseArgs(['--audit']).mode).toBe('audit');
+    expect(parseArgs(['--json']).json).toBe(true);
+    expect(parseArgs(['--base', 'origin/main']).base).toBe('origin/main');
+    expect(parseArgs(['--config', 'x.json']).configPath).toBe('x.json');
   });
 
-  it('parses --all alone', () => {
-    expect(parseArgs(['--all'])).toEqual({
-      json: false,
-      all: true,
-      configPath: undefined,
-    });
-  });
-
-  it('parses --all combined with --json and --config, order-independent', () => {
-    expect(parseArgs(['--json', '--all'])).toEqual({
-      json: true,
-      all: true,
-      configPath: undefined,
-    });
-    expect(parseArgs(['--all', '--config', 'foo.json'])).toEqual({
-      json: false,
-      all: true,
-      configPath: 'foo.json',
-    });
-  });
-
-  it('parses --config <path>', () => {
-    expect(parseArgs(['--config', 'foo.json'])).toEqual({
-      json: false,
-      all: false,
-      configPath: 'foo.json',
-    });
-  });
-
-  it('parses --json and --config together, order-independent', () => {
-    expect(parseArgs(['--config', 'foo.json', '--json'])).toEqual({
-      json: true,
-      all: false,
-      configPath: 'foo.json',
-    });
-  });
-
-  it('throws CliUsageError for an unknown flag', () => {
-    expect(() => parseArgs(['--bogus'])).toThrow(CliUsageError);
-  });
-
-  it('throws CliUsageError when --config is missing its value', () => {
-    expect(() => parseArgs(['--config'])).toThrow(CliUsageError);
+  it('rejects unknown flags, missing values, and bad combinations', () => {
+    expect(() => parseArgs(['--all'])).toThrow(CliUsageError);
+    expect(() => parseArgs(['--base'])).toThrow(/requires a git ref/);
+    expect(() => parseArgs(['--base', '--json'])).toThrow(/requires a git ref/);
+    expect(() => parseArgs(['--config'])).toThrow(/requires a path/);
+    expect(() => parseArgs(['--full', '--audit'])).toThrow(/mutually exclusive/);
+    expect(() => parseArgs(['--full', '--base', 'main'])).toThrow(/diff mode/);
   });
 });
 
 describe('formatResult', () => {
-  const violations: Violation[] = [
-    { type: 'md-count', message: 'Too many .md files: 26 (max 25)' },
-    { type: 'code-size', message: 'src/a.ts: 300 lines (max 250)', file: 'src/a.ts' },
-  ];
-  const warnings: Warning[] = [
-    { type: 'exemption-debt', message: 'exemptFiles "data.ts" exempts 1 file(s): src/data.ts' },
-    { type: 'stale-exemption', message: 'exemptFiles "ghost.md" matches no scanned file' },
-  ];
+  const clean = { violations: [], warnings: [], mode: 'diff' as const };
+  const violating = {
+    violations: [{ type: 'doc-size' as const, message: 'a.md: 9 lines (max 2)', file: 'a.md' }],
+    warnings: [{ type: 'stale-tier' as const, message: 'docs.tiers[0] matches no scanned file' }],
+    mode: 'full' as const,
+  };
 
-  // --json is the stable machine surface: assert the exact bytes for all
-  // three states — shape and ordering locked.
-  it('produces exact JSON output for a clean, warning-free run', () => {
-    const result = formatResult(
-      { violations: [], warnings: [] },
-      { json: true, all: false },
-    );
-    expect(result).toEqual({
-      exitCode: 0,
-      stdout: '{"violations":[],"warnings":[]}\n',
+  it('exit 0 when clean, 1 on violations; warnings never affect the code', () => {
+    expect(formatResult(clean, { json: false }).exitCode).toBe(0);
+    expect(formatResult(violating, { json: false }).exitCode).toBe(1);
+    expect(
+      formatResult({ ...clean, warnings: violating.warnings }, { json: false }).exitCode,
+    ).toBe(0);
+  });
+
+  it('--json is the stable machine surface: { violations, warnings, mode }', () => {
+    const output = formatResult(violating, { json: true });
+    expect(output.stdout).toBeDefined();
+    expect(JSON.parse(output.stdout!)).toEqual({
+      violations: violating.violations,
+      warnings: violating.warnings,
+      mode: 'full',
     });
   });
 
-  it('produces exact JSON output for a clean run WITH warnings — still exit 0', () => {
-    const result = formatResult(
-      { violations: [], warnings },
-      { json: true, all: false },
-    );
-    expect(result).toEqual({
-      exitCode: 0,
-      stdout: `${JSON.stringify({ violations: [], warnings })}\n`,
-    });
+  it('human output groups violations and warnings on stderr', () => {
+    const output = formatResult(violating, { json: false });
+    expect(output.stderr).toContain('[doc-size] a.md: 9 lines (max 2)');
+    expect(output.stderr).toContain('[stale-tier]');
+    expect(output.stderr).toContain('❌');
   });
 
-  it('produces exact JSON output for violations plus warnings', () => {
-    const result = formatResult(
-      { violations, warnings },
-      { json: true, all: false },
+  it('surfaces the audit header and the diff-fallback note', () => {
+    const audit = formatResult({ ...clean, mode: 'audit' as const }, { json: false });
+    expect(audit.stderr).toContain('--audit');
+    const fallback = formatResult(
+      { ...clean, mode: 'full' as const, note: 'ran --full instead' },
+      { json: false },
     );
-    expect(result).toEqual({
-      exitCode: 1,
-      stdout: `${JSON.stringify({ violations, warnings })}\n`,
-    });
-  });
-
-  // Human-readable format stays free to change wording/layout; assert loosely.
-  it('exits 0 with a passing message for a clean run (human)', () => {
-    const result = formatResult(
-      { violations: [], warnings: [] },
-      { json: false, all: false },
+    expect(fallback.stderr).toContain('ran --full instead');
+    const jsonFallback = formatResult(
+      { ...clean, mode: 'full' as const, note: 'ran --full instead' },
+      { json: true },
     );
-    expect(result.exitCode).toBe(0);
-    expect(result.stderr).toMatch(/within limits/);
-    expect(result.stderr).not.toContain('⚠');
-  });
-
-  it('exits 1 and lists every violation grouped by type (human)', () => {
-    const result = formatResult(
-      { violations, warnings: [] },
-      { json: false, all: false },
-    );
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain('[md-count]');
-    expect(result.stderr).toContain('[code-size]');
-    expect(result.stderr).toContain('Too many .md files');
-    expect((result.stderr?.match(/\n/g) ?? []).length).toBeGreaterThan(0);
-  });
-
-  it('prints a ⚠ block after the verdict without changing the exit code (human)', () => {
-    const result = formatResult(
-      { violations: [], warnings },
-      { json: false, all: false },
-    );
-    expect(result.exitCode).toBe(0);
-    expect(result.stderr).toContain('⚠');
-    expect(result.stderr).toContain('[exemption-debt]');
-    expect(result.stderr).toContain('[stale-exemption]');
-    expect(result.stderr?.indexOf('⚠')).toBeGreaterThan(
-      result.stderr?.indexOf('within limits') ?? 0,
-    );
-  });
-
-  it('notes the full-scope audit in the human header under --all', () => {
-    const result = formatResult(
-      { violations: [], warnings: [] },
-      { json: false, all: true },
-    );
-    expect(result.exitCode).toBe(0);
-    expect(result.stderr).toMatch(/full-scope audit/);
+    expect(jsonFallback.stderr).toContain('ran --full instead');
+    expect(JSON.parse(jsonFallback.stdout!).mode).toBe('full');
   });
 });

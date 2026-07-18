@@ -13,7 +13,7 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
-    "check": "pnpm typecheck && pnpm test && node packages/brickwall/dist/cli.js",
+    "check": "pnpm typecheck && pnpm test && node packages/brickwall/dist/cli.js --full",
     "changeset": "changeset"
   },
   "devDependencies": {

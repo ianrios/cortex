@@ -1,7 +1,14 @@
-import { extname } from 'node:path';
-import type { CodeLinesBudget } from './config.js';
+import {
+  basenameOf,
+  dirEntryMatch,
+  matchesAnySubstring,
+  normalizeSlashes,
+  resolveTier,
+  selectorKey,
+  type Tier,
+} from './match.js';
 
-export type ViolationType = 'md-count' | 'doc-size' | 'code-size' | 'eslint-disable';
+export type ViolationType = 'doc-count' | 'doc-size' | 'code-size' | 'banned-pragma';
 
 export interface Violation {
   type: ViolationType;
@@ -9,7 +16,7 @@ export interface Violation {
   file?: string;
 }
 
-export type WarningType = 'exemption-debt' | 'stale-exemption';
+export type WarningType = 'exemption-debt' | 'stale-exemption' | 'stale-tier';
 
 /** Mirrors Violation. Warnings NEVER affect the exit code. */
 export interface Warning {
@@ -27,87 +34,50 @@ export function countLines(content: string): number {
   return content.split('\n').length - (content.endsWith('\n') ? 1 : 0);
 }
 
-function normalizeConfigPath(dir: string): string {
-  return dir.split('\\').join('/').replace(/\/+$/, '');
-}
-
-function hasPrefix(file: string, dirs: string[]): boolean {
-  return dirs.some((dir) => {
-    const normalized = normalizeConfigPath(dir);
-    return file === normalized || file.startsWith(`${normalized}/`);
-  });
-}
-
-export function isExempt(file: string, archiveDirs: string[]): boolean {
-  return hasPrefix(file, archiveDirs);
+/** Archive membership uses the one dir-entry grammar (bare = any depth,
+ *  slash = root prefix, leading `/` root-anchors). */
+export function isArchived(file: string, archiveDirs: string[]): boolean {
+  return archiveDirs.some((dir) => dirEntryMatch(file, dir) >= 0);
 }
 
 /** Matches by exact relative path OR basename (e.g. "CHANGELOG.md" matches any depth). */
 export function isExemptFile(file: string, exemptFiles: string[]): boolean {
-  const base = file.split('/').pop() ?? file;
+  const base = basenameOf(file);
   return exemptFiles.some((entry) => {
-    const normalized = normalizeConfigPath(entry);
+    const normalized = normalizeSlashes(entry);
     return file === normalized || base === normalized;
   });
 }
 
-export type DocTier = 'story' | 'default';
-
-/** Resolves which line-budget tier a doc file falls under. Call after exemption filtering. */
-export function resolveDocTier(file: string, storyDirs: string[]): DocTier {
-  return hasPrefix(file, storyDirs) ? 'story' : 'default';
+export function isTestFile(file: string, testFilePatterns: string[]): boolean {
+  return matchesAnySubstring(file, testFilePatterns);
 }
 
-const TEST_FILE_RE = /\.(test|spec)\./;
-
-export function isTestFile(file: string): boolean {
-  return TEST_FILE_RE.test(file);
-}
-
-/** Resolves the code-size limit for a file: a plain number applies to all files;
- *  a map looks up the file's extension (config validation guarantees coverage). */
-export function resolveCodeLimit(file: string, codeLines: CodeLinesBudget): number {
-  if (typeof codeLines === 'number') return codeLines;
-  const ext = extname(file);
-  const limit = codeLines[ext];
-  if (limit === undefined) {
-    throw new Error(`brickwall: no code-size budget configured for extension "${ext}"`);
-  }
-  return limit;
-}
-
-export function checkMdCount(
-  mdFiles: string[],
-  archiveDirs: string[],
-  exemptFiles: string[],
-  limit: number,
-): Violation[] {
-  const active = mdFiles.filter(
-    (f) => !isExempt(f, archiveDirs) && !isExemptFile(f, exemptFiles),
-  );
-  if (active.length > limit) {
+export function checkDocCount(docFiles: string[], limit: number): Violation[] {
+  if (docFiles.length > limit) {
     return [
       {
-        type: 'md-count',
-        message: `Too many .md files: ${active.length} (max ${limit})`,
+        type: 'doc-count',
+        message: `Too many doc files: ${docFiles.length} (max ${limit})`,
       },
     ];
   }
   return [];
 }
 
+/** First matching tier in config order sets the cap; else the section default. */
+function limitFor(file: string, tiers: Tier[], maxLines: number): number {
+  return resolveTier(file, tiers)?.maxLines ?? maxLines;
+}
+
 export function checkDocSize(
   files: FileContent[],
-  storyDirs: string[],
-  archiveDirs: string[],
-  exemptFiles: string[],
-  budgets: { mdLines: number; storyLines: number },
+  tiers: Tier[],
+  maxLines: number,
 ): Violation[] {
   const violations: Violation[] = [];
   for (const { path, content } of files) {
-    if (isExempt(path, archiveDirs) || isExemptFile(path, exemptFiles)) continue;
-    const tier = resolveDocTier(path, storyDirs);
-    const max = tier === 'story' ? budgets.storyLines : budgets.mdLines;
+    const max = limitFor(path, tiers, maxLines);
     const lines = countLines(content);
     if (lines > max) {
       violations.push({
@@ -122,15 +92,15 @@ export function checkDocSize(
 
 export function checkCodeSize(
   files: FileContent[],
-  archiveDirs: string[],
-  exemptFiles: string[],
-  codeLines: CodeLinesBudget,
+  tiers: Tier[],
+  maxLines: number,
+  testFilePatterns: string[],
 ): Violation[] {
   const violations: Violation[] = [];
   for (const { path, content } of files) {
-    if (isExempt(path, archiveDirs) || isExemptFile(path, exemptFiles)) continue;
-    if (isTestFile(path)) continue;
-    const max = resolveCodeLimit(path, codeLines);
+    // Test files skip the size cap ONLY — never the pragma scan.
+    if (isTestFile(path, testFilePatterns)) continue;
+    const max = limitFor(path, tiers, maxLines);
     const lines = countLines(content);
     if (lines > max) {
       violations.push({
@@ -144,12 +114,38 @@ export function checkCodeSize(
 }
 
 /**
- * Audits custom exemptFiles entries against the scanned set (the md and code
- * files the checks see — test files excluded, archiveDirs removed). Each
- * custom entry yields exactly one warning, in config-entry order: an
- * `exemption-debt` warning enumerating EVERY matched file (basename matching
- * means one entry can shield many), or `stale-exemption` when it matches
- * nothing. Default entries (e.g. CHANGELOG.md) are always silent.
+ * Bare per-line substring scan — no comment parsing, so it is fully
+ * language-agnostic and prose mentions flag deliberately. Runs on EVERY
+ * code file including tests and exemptFiles; only archiveDirs escape.
+ * One violation per line: the first configured pragma that matches.
+ */
+export function checkBannedPragmas(
+  files: FileContent[],
+  bannedPragmas: string[],
+): Violation[] {
+  if (bannedPragmas.length === 0) return [];
+  const violations: Violation[] = [];
+  for (const { path, content } of files) {
+    content.split('\n').forEach((line, i) => {
+      const pragma = bannedPragmas.find((p) => line.includes(p));
+      if (pragma !== undefined) {
+        violations.push({
+          type: 'banned-pragma',
+          message: `${path}:${i + 1} - banned pragma "${pragma}": ${line.trim()}`,
+          file: path,
+        });
+      }
+    });
+  }
+  return violations;
+}
+
+/**
+ * Audits custom exemptFiles entries against the scanned set (doc and code
+ * files as the checks see them, archives removed). Each custom entry yields
+ * exactly one warning, in config-entry order: `exemption-debt` enumerating
+ * EVERY matched file, or `stale-exemption` when it matches nothing.
+ * Default entries (e.g. CHANGELOG.md) are always silent.
  */
 export function checkExemptionDebt(
   scannedFiles: string[],
@@ -177,28 +173,34 @@ export function checkExemptionDebt(
   return warnings;
 }
 
-// Matches the ESLint disable-comment pragma inside `//` line comments or
-// `/* ... */` block comments. Deliberately a naive line-regex (matching the
-// source scripts this was extracted from): it flags prose mentions of the
-// pragma too, not just real directives. See the package README for details.
-const ESLINT_DISABLE_RE = /\/\/.*(eslint-disable)|(\/\*.*eslint-disable.*\*\/)/;
-
-export function checkEslintDisable(
-  files: FileContent[],
-  archiveDirs: string[],
-): Violation[] {
-  const violations: Violation[] = [];
-  for (const { path, content } of files) {
-    if (isExempt(path, archiveDirs)) continue;
-    content.split('\n').forEach((line, i) => {
-      if (ESLINT_DISABLE_RE.test(line)) {
-        violations.push({
-          type: 'eslint-disable',
-          message: `${path}:${i + 1} - not allowed: ${line.trim()}`,
-          file: path,
-        });
-      }
-    });
+/** A custom tier matching zero of its section's files is dead or fully
+ *  shadowed — never silent (the `stale-exemption` pattern applied to
+ *  tiers). Default tiers stay silent, like default exemptFiles: a fresh
+ *  adopter repo without `.ai/plans` is not misconfigured. */
+export function checkStaleTiers(
+  section: 'docs' | 'code',
+  tiers: Tier[],
+  sectionFiles: string[],
+  defaultTiers: Tier[],
+): Warning[] {
+  // selectorKey identity: a re-spelled or reordered equivalent of a default
+  // tier ("docs/" for "/docs", "*.md" for ".md") is still a default tier.
+  const tierKey = (t: Tier): string => `${selectorKey(t)}#${t.maxLines}`;
+  const defaults = new Set(defaultTiers.map(tierKey));
+  const live = new Set<Tier>();
+  for (const file of sectionFiles) {
+    const tier = resolveTier(file, tiers);
+    if (tier) live.add(tier);
   }
-  return violations;
+  const warnings: Warning[] = [];
+  tiers.forEach((tier, i) => {
+    if (defaults.has(tierKey(tier))) return;
+    if (!live.has(tier)) {
+      warnings.push({
+        type: 'stale-tier',
+        message: `${section}.tiers[${i}] matches no scanned file`,
+      });
+    }
+  });
+  return warnings;
 }

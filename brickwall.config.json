@@ -1,5 +1,9 @@
 {
-  "storyDirs": ["docs", ".ai/plans", ".ai/specs"],
+  "docs": {
+    "tiers": [
+      { "dirs": [".ai/plans", ".ai/specs", "/docs"], "maxLines": 280 }
+    ]
+  },
   "archiveDirs": [
     ".ai/completed",
     "docs/archive",

@@ -1,0 +1,4 @@
+const ok = 1;
+// eslint-disable-next-line no-console
+const mention = '/* eslint-disable */ in prose';
+const fine = 2;

@@ -1,6 +1,4 @@
 {
-  "budgets": {
-    "mdLines": 3
-  },
+  "docs": { "maxLines": 3 },
   "ignoreDirs": ["node_modules", ".git", "hidden"]
 }

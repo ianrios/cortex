@@ -1,193 +1,219 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { run } from '../src/run.js';
-import type { ViolationType } from '../src/checks.js';
+import { BrickwallConfigError } from '../src/config.js';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const fixtures = join(here, 'fixtures');
+const fixture = (name: string): string =>
+  join(new URL('./fixtures', import.meta.url).pathname, name);
 
-describe('run() against fixtures', () => {
-  it('reports no violations and no warnings for the clean fixture', () => {
-    const { violations, warnings } = run({ cwd: join(fixtures, 'clean') });
-    expect(violations).toEqual([]);
-    expect(warnings).toEqual([]);
+// Fixture dirs sit inside the cortex git repo, so diff mode WORKS there and
+// is nondeterministic (depends on the developer's working tree). Fixture
+// assertions therefore pin mode: 'full' / 'audit'; diff semantics are
+// tested in disposable git repos below.
+
+describe('run — full mode on fixture repos', () => {
+  it('clean fixture passes with no warnings', () => {
+    const result = run({ cwd: fixture('clean'), mode: 'full' });
+    expect(result.violations).toEqual([]);
+    expect(result.warnings).toEqual([]);
+    expect(result.mode).toBe('full');
   });
 
-  it('reports exactly one violation of each type for the violating fixture', () => {
-    const { violations } = run({ cwd: join(fixtures, 'violating') });
-    const types = violations.map((v) => v.type).sort();
-    const expected: ViolationType[] = [
-      'code-size',
-      'doc-size',
-      'eslint-disable',
-      'md-count',
-    ].sort() as ViolationType[];
-    expect(types).toEqual(expected);
-    expect(violations).toHaveLength(4);
+  it('violating fixture reports every violation type', () => {
+    const result = run({ cwd: fixture('violating'), mode: 'full' });
+    const types = result.violations.map((v) => v.type).sort();
+    expect(types).toEqual(['banned-pragma', 'code-size', 'doc-count', 'doc-size']);
+    const pragma = result.violations.find((v) => v.type === 'banned-pragma');
+    expect(pragma?.file).toBe('src/bad.ts');
+    expect(pragma?.message).toContain('src/bad.ts:1');
   });
 
-  it('picks up the violating fixture\'s own brickwall.config.json budgets', () => {
-    const { config } = run({ cwd: join(fixtures, 'violating') });
-    expect(config.budgets.mdFileCount).toBe(1);
-    expect(config.budgets.codeLines).toBe(2);
+  it('dirclaim fixture: a dirs claim beats the default code patterns', () => {
+    const result = run({ cwd: fixture('dirclaim'), mode: 'full' });
+    // docs/example.ts (3 lines) is claimed as a DOC (maxLines 2, tiers []).
+    const docSize = result.violations.filter((v) => v.type === 'doc-size');
+    expect(docSize).toHaveLength(1);
+    expect(docSize[0]?.file).toBe('docs/example.ts');
+    // src/app.ts stays code and passes.
+    expect(result.violations.some((v) => v.file === 'src/app.ts')).toBe(false);
   });
 
-  it('falls back to default budgets for the clean fixture (no config file)', () => {
-    const { config } = run({ cwd: join(fixtures, 'clean') });
-    expect(config.budgets.mdFileCount).toBe(25);
-  });
-
-  it('sees a doc hidden in an ignored dir only under --all', () => {
-    const cwd = join(fixtures, 'all-mode');
-    expect(run({ cwd }).violations).toEqual([]);
-    const { violations } = run({ cwd, all: true });
-    expect(violations).toEqual([
-      {
-        type: 'doc-size',
-        message: 'hidden/big.md: 5 lines (max 3)',
-        file: 'hidden/big.md',
-      },
-    ]);
+  it('ambiguous fixture throws a loud per-file config error', () => {
+    expect(() => run({ cwd: fixture('ambiguous'), mode: 'full' })).toThrow(
+      BrickwallConfigError,
+    );
+    expect(() => run({ cwd: fixture('ambiguous'), mode: 'full' })).toThrow(/x\.ts/);
   });
 });
 
-describe('run() in temp repos (warnings + --all discovery)', () => {
+describe('run — audit mode', () => {
+  it('sees docs hidden in ignored dirs (shields off)', () => {
+    const full = run({ cwd: fixture('all-mode'), mode: 'full' });
+    expect(full.violations).toEqual([]);
+    const audit = run({ cwd: fixture('all-mode'), mode: 'audit' });
+    expect(audit.mode).toBe('audit');
+    expect(
+      audit.violations.some(
+        (v) => v.type === 'doc-size' && v.file === 'hidden/big.md',
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('run — diff mode in a real git repo', () => {
   let dir: string;
 
   afterEach(() => {
     if (dir) rmSync(dir, { recursive: true, force: true });
   });
 
-  function makeTmpRepo(config: object): string {
-    const d = mkdtempSync(join(tmpdir(), 'brickwall-run-'));
-    writeFileSync(join(d, 'brickwall.config.json'), JSON.stringify(config));
-    return d;
-  }
-
-  it('passes an oversized exemptFiles code file WITH an exemption-debt warning', () => {
-    dir = makeTmpRepo({ budgets: { codeLines: 2 }, exemptFiles: ['big.ts'] });
-    mkdirSync(join(dir, 'src'));
-    writeFileSync(
-      join(dir, 'src', 'big.ts'),
-      'const a = 1;\nconst b = 2;\nconst c = 3;\n',
-    );
-    const { violations, warnings } = run({ cwd: dir });
-    expect(violations).toEqual([]);
-    expect(warnings).toEqual([
-      {
-        type: 'exemption-debt',
-        message: 'exemptFiles "big.ts" exempts 1 file(s): src/big.ts',
-      },
-    ]);
-  });
-
-  it('still fires eslint-disable inside an exemptFiles-exempted file', () => {
-    dir = makeTmpRepo({ budgets: { codeLines: 50 }, exemptFiles: ['bad.ts'] });
-    mkdirSync(join(dir, 'src'));
-    // Written at runtime as data — the ban on the pragma in source does not
-    // apply to test-generated content.
-    writeFileSync(
-      join(dir, 'src', 'bad.ts'),
-      '// eslint-disable-next-line no-console\nconsole.log(1);\n',
-    );
-    const { violations, warnings } = run({ cwd: dir });
-    expect(violations).toHaveLength(1);
-    expect(violations[0]?.type).toBe('eslint-disable');
-    expect(warnings).toEqual([
-      {
-        type: 'exemption-debt',
-        message: 'exemptFiles "bad.ts" exempts 1 file(s): src/bad.ts',
-      },
-    ]);
-  });
-
-  it('reports a custom entry matching nothing as stale-exemption', () => {
-    dir = makeTmpRepo({ exemptFiles: ['ghost.md'] });
-    writeFileSync(join(dir, 'README.md'), '# hi\n');
-    const { violations, warnings } = run({ cwd: dir });
-    expect(violations).toEqual([]);
-    expect(warnings).toEqual([
-      {
-        type: 'stale-exemption',
-        message: 'exemptFiles "ghost.md" matches no scanned file',
-      },
-    ]);
-  });
-
-  it('counts an entry whose only matches are archived as stale', () => {
-    dir = makeTmpRepo({ archiveDirs: ['old'], exemptFiles: ['legacy.md'] });
-    mkdirSync(join(dir, 'old'));
-    writeFileSync(join(dir, 'old', 'legacy.md'), '# legacy\n');
-    const { warnings } = run({ cwd: dir });
-    expect(warnings).toEqual([
-      {
-        type: 'stale-exemption',
-        message: 'exemptFiles "legacy.md" matches no scanned file',
-      },
-    ]);
-  });
-
-  it('discovers a runtime-created gitignored file under --all, never node_modules', () => {
-    dir = makeTmpRepo({ budgets: { mdLines: 2 } });
-    execFileSync('git', ['init'], { cwd: dir, stdio: 'ignore' });
-    writeFileSync(join(dir, '.gitignore'), 'secret.md\n');
-    writeFileSync(join(dir, 'secret.md'), 'a\nb\nc\nd\n');
-    mkdirSync(join(dir, 'node_modules'));
-    writeFileSync(join(dir, 'node_modules', 'hidden.md'), 'a\nb\nc\nd\n');
-
-    // Normal run: git ls-files cannot see the gitignored file, and default
-    // ignoreDirs drop node_modules.
-    expect(run({ cwd: dir }).violations).toEqual([]);
-
-    // --all: fs walk finds the gitignored file; node_modules stays skipped
-    // (exact equality — no node_modules/hidden.md violation appears).
-    const { violations } = run({ cwd: dir, all: true });
-    expect(violations).toEqual([
-      { type: 'doc-size', message: 'secret.md: 4 lines (max 2)', file: 'secret.md' },
-    ]);
-  });
-
-  it('skips tracked files deleted from the working tree (unstaged deletion)', () => {
-    // Found dogfooding petal: git ls-files --cached lists a file whose
-    // deletion is unstaged; reading it crashed with a raw ENOENT.
-    dir = makeTmpRepo({ budgets: { mdLines: 2 } });
-    execFileSync('git', ['init'], { cwd: dir, stdio: 'ignore' });
-    writeFileSync(join(dir, 'doomed.md'), 'a\nb\nc\nd\n');
-    execFileSync('git', ['add', 'doomed.md'], { cwd: dir, stdio: 'ignore' });
+  const git = (cwd: string, ...args: string[]): void => {
     execFileSync(
       'git',
-      ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-m', 'x'],
-      { cwd: dir, stdio: 'ignore' },
+      ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args],
+      { cwd, stdio: 'ignore' },
     );
-    rmSync(join(dir, 'doomed.md'));
+  };
 
-    const { violations } = run({ cwd: dir });
-    expect(violations).toEqual([]);
+  function makeRepo(): string {
+    const repo = mkdtempSync(join(tmpdir(), 'brickwall-diff-'));
+    git(repo, 'init', '-q');
+    writeFileSync(
+      join(repo, 'brickwall.config.json'),
+      JSON.stringify({ docs: { maxLines: 2, tiers: [] } }),
+    );
+    // Committed and OVER budget: full mode must flag it, diff mode must not.
+    writeFileSync(join(repo, 'old.md'), 'a\nb\nc\nd\n');
+    git(repo, 'add', '.');
+    git(repo, 'commit', '-q', '-m', 'base');
+    return repo;
+  }
+
+  it('checks only changed/untracked content; unchanged violations stay silent', () => {
+    dir = makeRepo();
+    const before = run({ cwd: dir });
+    expect(before.mode).toBe('diff');
+    expect(before.violations).toEqual([]);
+
+    writeFileSync(join(dir, 'new.md'), '1\n2\n3\n4\n5\n');
+    const after = run({ cwd: dir });
+    expect(after.violations).toHaveLength(1);
+    expect(after.violations[0]).toMatchObject({ type: 'doc-size', file: 'new.md' });
+
+    const full = run({ cwd: dir, mode: 'full' });
+    expect(full.violations.map((v) => v.file).sort()).toEqual(['new.md', 'old.md']);
   });
 
-  it('disables archiveDirs and exemptFiles under --all (warnings empty too)', () => {
-    dir = makeTmpRepo({
-      budgets: { mdLines: 2 },
-      archiveDirs: ['old'],
-      exemptFiles: ['data.md'],
-    });
-    mkdirSync(join(dir, 'old'));
-    writeFileSync(join(dir, 'old', 'archived.md'), 'a\nb\nc\n');
-    writeFileSync(join(dir, 'data.md'), 'a\nb\nc\n');
+  it('doc-count and warnings stay repo-wide in diff mode', () => {
+    dir = makeRepo();
+    writeFileSync(
+      join(dir, 'brickwall.config.json'),
+      JSON.stringify({
+        docs: { maxCount: 1, maxLines: 2, tiers: [] },
+        exemptFiles: ['CHANGELOG.md', 'old.md'],
+      }),
+    );
+    writeFileSync(join(dir, 'extra.md'), 'x\n');
+    const result = run({ cwd: dir });
+    // The count covers non-exempt docs only: old.md is exempt, so extra.md
+    // alone sits within maxCount 1.
+    const count = result.violations.filter((v) => v.type === 'doc-count');
+    expect(count).toEqual([]);
+    // Repo-wide exemption audit sees old.md even though it is unchanged.
+    expect(result.warnings.some((w) => w.type === 'exemption-debt')).toBe(true);
 
-    const normal = run({ cwd: dir });
-    expect(normal.violations).toEqual([]);
-    expect(normal.warnings.map((w) => w.type)).toEqual(['exemption-debt']);
+    writeFileSync(join(dir, 'more.md'), 'y\n');
+    const over = run({ cwd: dir });
+    expect(over.violations.some((v) => v.type === 'doc-count')).toBe(true);
+  });
 
-    const all = run({ cwd: dir, all: true });
-    expect(all.violations.map((v) => v.file).sort()).toEqual([
-      'data.md',
-      'old/archived.md',
-    ]);
-    expect(all.warnings).toEqual([]);
+  it('respects --base for committed work', () => {
+    dir = makeRepo();
+    writeFileSync(join(dir, 'branch.md'), '1\n2\n3\n');
+    git(dir, 'add', '.');
+    git(dir, 'commit', '-q', '-m', 'feature work');
+    // vs HEAD: nothing changed.
+    expect(run({ cwd: dir }).violations).toEqual([]);
+    // vs the first commit: the committed doc is in scope.
+    const base = execFileSync('git', ['rev-list', '--max-parents=0', 'HEAD'], {
+      cwd: dir,
+      encoding: 'utf-8',
+    }).trim();
+    const result = run({ cwd: dir, base });
+    expect(result.violations).toMatchObject([{ type: 'doc-size', file: 'branch.md' }]);
+  });
+
+  it('errors (exit-2 class) when an EXPLICIT --base cannot be resolved', () => {
+    dir = makeRepo();
+    expect(() => run({ cwd: dir, base: 'no-such-ref' })).toThrow(
+      BrickwallConfigError,
+    );
+    expect(() => run({ cwd: dir, base: 'no-such-ref' })).toThrow(/no-such-ref/);
+  });
+
+  it('warns stale-exemption for an entry whose only matches are archived', () => {
+    dir = makeRepo();
+    mkdirSync(join(dir, 'docs/archive'), { recursive: true });
+    writeFileSync(join(dir, 'docs/archive/data.md'), 'x\n');
+    writeFileSync(
+      join(dir, 'brickwall.config.json'),
+      JSON.stringify({ docs: { maxLines: 2, tiers: [] }, exemptFiles: ['data.md'] }),
+    );
+    const result = run({ cwd: dir });
+    // Archive filtering precedes the debt audit, so the entry matches nothing.
+    expect(result.warnings).toMatchObject([{ type: 'stale-exemption' }]);
+  });
+
+  it('falls back to full with a note outside a git work tree', () => {
+    dir = mkdtempSync(join(tmpdir(), 'brickwall-nogit-'));
+    writeFileSync(
+      join(dir, 'brickwall.config.json'),
+      JSON.stringify({ docs: { maxLines: 1, tiers: [] } }),
+    );
+    writeFileSync(join(dir, 'big.md'), 'a\nb\n');
+    const result = run({ cwd: dir });
+    expect(result.mode).toBe('full');
+    expect(result.note).toContain('git');
+    expect(result.violations).toHaveLength(1);
+  });
+
+  it('ignores files deleted but not yet staged (the petal crash class)', () => {
+    dir = makeRepo();
+    rmSync(join(dir, 'old.md'));
+    expect(() => run({ cwd: dir })).not.toThrow();
+    expect(() => run({ cwd: dir, mode: 'full' })).not.toThrow();
+  });
+});
+
+describe('run — pragma scan boundaries', () => {
+  let dir: string;
+  afterEach(() => {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('exemptFiles and test files never escape the pragma scan', () => {
+    dir = mkdtempSync(join(tmpdir(), 'brickwall-pragma-'));
+    const sample = readFileSync(
+      new URL('./fixtures/pragmas/sample-code.txt', import.meta.url),
+      'utf-8',
+    );
+    mkdirSync(join(dir, 'src'));
+    writeFileSync(
+      join(dir, 'brickwall.config.json'),
+      JSON.stringify({ exemptFiles: ['src/data.ts'] }),
+    );
+    writeFileSync(join(dir, 'src/data.ts'), sample);
+    writeFileSync(join(dir, 'src/a.test.ts'), sample);
+    const result = run({ cwd: dir, mode: 'full' });
+    const pragmaFiles = result.violations
+      .filter((v) => v.type === 'banned-pragma')
+      .map((v) => v.file)
+      .sort();
+    expect(new Set(pragmaFiles)).toEqual(new Set(['src/data.ts', 'src/a.test.ts']));
+    // And the exemption itself is visible debt.
+    expect(result.warnings.some((w) => w.type === 'exemption-debt')).toBe(true);
   });
 });

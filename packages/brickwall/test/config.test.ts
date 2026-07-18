@@ -6,145 +6,136 @@ import {
 } from '../src/config.js';
 
 describe('validateAndMergeConfig', () => {
-  it('returns defaults for undefined input', () => {
+  it('returns full defaults for undefined/null', () => {
     expect(validateAndMergeConfig(undefined)).toEqual(DEFAULT_CONFIG);
-  });
-
-  it('returns defaults for null input', () => {
     expect(validateAndMergeConfig(null)).toEqual(DEFAULT_CONFIG);
   });
 
-  it('merges partial budgets over defaults', () => {
-    const config = validateAndMergeConfig({ budgets: { mdLines: 100 } });
-    expect(config.budgets.mdLines).toBe(100);
-    expect(config.budgets.mdFileCount).toBe(DEFAULT_CONFIG.budgets.mdFileCount);
-    expect(config.budgets.storyLines).toBe(DEFAULT_CONFIG.budgets.storyLines);
-    expect(config.budgets.codeLines).toBe(DEFAULT_CONFIG.budgets.codeLines);
+  it('default pragma values come from the JSON data file, not source', () => {
+    expect(DEFAULT_CONFIG.bannedPragmas).toHaveLength(1);
+    expect(DEFAULT_CONFIG.bannedPragmas[0]).toContain('eslint');
   });
 
-  it('overrides array fields wholesale, not merged', () => {
-    const config = validateAndMergeConfig({ storyDirs: ['custom'] });
-    expect(config.storyDirs).toEqual(['custom']);
-  });
-
-  it('overrides banEslintDisable', () => {
-    const config = validateAndMergeConfig({ banEslintDisable: false });
-    expect(config.banEslintDisable).toBe(false);
-  });
-
-  it('rejects a non-object root', () => {
-    expect(() => validateAndMergeConfig('nope')).toThrow(/must be an object/);
-    expect(() => validateAndMergeConfig(42)).toThrow(/must be an object/);
-    expect(() => validateAndMergeConfig([1, 2])).toThrow(/must be an object/);
-  });
-
-  it('rejects unknown top-level keys', () => {
-    expect(() => validateAndMergeConfig({ bogus: true })).toThrow(
-      /unknown key "bogus"/,
-    );
-  });
-
-  it('rejects unknown budgets keys', () => {
-    expect(() => validateAndMergeConfig({ budgets: { bogus: 1 } })).toThrow(
-      /unknown key "budgets.bogus"/,
-    );
-  });
-
-  it('rejects a non-object budgets value', () => {
-    expect(() => validateAndMergeConfig({ budgets: 'nope' })).toThrow(
-      /"budgets" must be an object/,
-    );
-  });
-
-  it('rejects non-positive budget numbers', () => {
-    expect(() => validateAndMergeConfig({ budgets: { mdLines: 0 } })).toThrow(
-      /positive number/,
-    );
-    expect(() => validateAndMergeConfig({ budgets: { mdLines: -5 } })).toThrow(
-      /positive number/,
-    );
+  it('rejects unknown keys at every level (old configs fail loudly)', () => {
+    expect(() => validateAndMergeConfig({ storyDirs: [] })).toThrow(BrickwallConfigError);
+    expect(() => validateAndMergeConfig({ budgets: {} })).toThrow(BrickwallConfigError);
+    expect(() => validateAndMergeConfig({ docs: { maxWords: 1 } })).toThrow(/docs.maxWords/);
     expect(() =>
-      validateAndMergeConfig({ budgets: { mdLines: 'ten' } }),
-    ).toThrow(/positive number/);
+      validateAndMergeConfig({ docs: { matches: [{ globs: [] }] } }),
+    ).toThrow(/docs.matches\[0\].globs/);
+    expect(() =>
+      validateAndMergeConfig({ docs: { tiers: [{ patterns: ['.md'], max: 1 }] } }),
+    ).toThrow(/docs.tiers\[0\].max/);
   });
 
-  it('rejects non-string-array fields', () => {
-    expect(() => validateAndMergeConfig({ storyDirs: 'docs' })).toThrow(
-      /must be an array of strings/,
-    );
-    expect(() => validateAndMergeConfig({ storyDirs: [1, 2] })).toThrow(
-      /must be an array of strings/,
+  it('merges groups per key over defaults', () => {
+    const config = validateAndMergeConfig({ docs: { maxLines: 120 } });
+    expect(config.docs.maxLines).toBe(120);
+    expect(config.docs.maxCount).toBe(DEFAULT_CONFIG.docs.maxCount);
+    expect(config.docs.tiers).toEqual(DEFAULT_CONFIG.docs.tiers);
+    expect(config.code).toEqual(DEFAULT_CONFIG.code);
+  });
+
+  it('arrays replace defaults wholesale', () => {
+    const config = validateAndMergeConfig({
+      docs: { tiers: [] },
+      ignoreDirs: ['node_modules'],
+    });
+    expect(config.docs.tiers).toEqual([]);
+    expect(config.ignoreDirs).toEqual(['node_modules']);
+  });
+
+  it('rejects empty matches — a silent section disable', () => {
+    expect(() => validateAndMergeConfig({ docs: { matches: [] } })).toThrow(/non-empty/);
+  });
+
+  it('rejects a selector with neither dirs nor patterns', () => {
+    expect(() => validateAndMergeConfig({ code: { matches: [{}] } })).toThrow(
+      /at least one/,
     );
   });
 
-  it('rejects a non-boolean banEslintDisable', () => {
-    expect(() => validateAndMergeConfig({ banEslintDisable: 'yes' })).toThrow(
-      /must be a boolean/,
-    );
+  it('rejects empty selector fields — present-but-unmatchable is a silent disable', () => {
+    expect(() =>
+      validateAndMergeConfig({ docs: { matches: [{ dirs: [], patterns: ['.md'] }] } }),
+    ).toThrow(/must not be an empty array/);
+    expect(() =>
+      validateAndMergeConfig({ code: { tiers: [{ patterns: [], maxLines: 5 }] } }),
+    ).toThrow(/must not be an empty array/);
   });
 
-  it('throws BrickwallConfigError (not a plain Error) on invalid input', () => {
-    expect(() => validateAndMergeConfig({ bogus: true })).toThrow(
+  it('rejects glob-shaped patterns that could never match a basename', () => {
+    // A normalized suffix containing / or * is impossible; literal-char
+    // oddities like "*.{ts,tsx}" stay legal (braces are filename chars).
+    for (const pattern of ['**/*.md', 'src/*.ts']) {
+      expect(() =>
+        validateAndMergeConfig({ docs: { matches: [{ patterns: [pattern] }] } }),
+      ).toThrow(/not a basename suffix/);
+    }
+  });
+
+  it('rejects duplicate patterns after normalization within one selector', () => {
+    expect(() =>
+      validateAndMergeConfig({
+        code: { matches: [{ patterns: ['.scss', '*.scss'] }] },
+      }),
+    ).toThrow(/duplicate/);
+  });
+
+  it('rejects identical selectors within one matches list', () => {
+    expect(() =>
+      validateAndMergeConfig({
+        docs: { matches: [{ patterns: ['.md'] }, { patterns: ['*.md'] }] },
+      }),
+    ).toThrow(/duplicates an earlier selector/);
+  });
+
+  it('rejects duplicate tier selectors and requires positive maxLines', () => {
+    expect(() =>
+      validateAndMergeConfig({
+        code: {
+          tiers: [
+            { patterns: ['.scss'], maxLines: 600 },
+            { patterns: ['*.scss'], maxLines: 300 },
+          ],
+        },
+      }),
+    ).toThrow(/duplicates an earlier tier/);
+    expect(() =>
+      validateAndMergeConfig({ code: { tiers: [{ patterns: ['.scss'] }] } }),
+    ).toThrow(/maxLines/);
+    expect(() =>
+      validateAndMergeConfig({ code: { tiers: [{ patterns: ['.scss'], maxLines: 0 }] } }),
+    ).toThrow(/positive/);
+  });
+
+  it('accepts the portfolio-style multiband config (scss 600 over ts 250)', () => {
+    const config = validateAndMergeConfig({
+      code: {
+        matches: [{ patterns: ['.ts', '.tsx', '.js', '.jsx', '.scss'] }],
+        maxLines: 250,
+        tiers: [{ patterns: ['.scss'], maxLines: 600 }],
+      },
+    });
+    expect(config.code.tiers[0]?.maxLines).toBe(600);
+    expect(config.code.maxLines).toBe(250);
+  });
+
+  it('bannedPragmas may be [] (visible disable) but never non-strings', () => {
+    expect(validateAndMergeConfig({ bannedPragmas: [] }).bannedPragmas).toEqual([]);
+    expect(() => validateAndMergeConfig({ bannedPragmas: [1] })).toThrow(
+      BrickwallConfigError,
+    );
+    expect(() => validateAndMergeConfig({ bannedPragmas: [''] })).toThrow(
       BrickwallConfigError,
     );
   });
 
-  it('defaults exemptFiles to ["CHANGELOG.md"]', () => {
-    expect(DEFAULT_CONFIG.exemptFiles).toEqual(['CHANGELOG.md']);
-  });
-
-  it('overrides exemptFiles', () => {
-    const config = validateAndMergeConfig({ exemptFiles: ['NOTES.md'] });
-    expect(config.exemptFiles).toEqual(['NOTES.md']);
-  });
-
-  it('pins the exact default ignoreDirs list', () => {
-    expect(DEFAULT_CONFIG.ignoreDirs).toEqual([
-      'node_modules',
-      '.git',
-      'dist',
-      'build',
-      'coverage',
-      '.changeset',
-      '.claude',
-      '.github',
-      '.vscode',
-      '.codex',
-      '.cursor',
-    ]);
-  });
-
-  it('accepts a plain number for budgets.codeLines', () => {
-    const config = validateAndMergeConfig({ budgets: { codeLines: 300 } });
-    expect(config.budgets.codeLines).toBe(300);
-  });
-
-  it('accepts a per-extension map for budgets.codeLines covering every codeExtension', () => {
-    const config = validateAndMergeConfig({
-      codeExtensions: ['.ts', '.scss'],
-      budgets: { codeLines: { '.ts': 250, '.scss': 600 } },
-    });
-    expect(config.budgets.codeLines).toEqual({ '.ts': 250, '.scss': 600 });
-  });
-
-  it('rejects a codeLines map missing an entry for a configured extension', () => {
-    expect(() =>
-      validateAndMergeConfig({
-        codeExtensions: ['.ts', '.scss'],
-        budgets: { codeLines: { '.ts': 250 } },
-      }),
-    ).toThrow(/missing an entry/);
-  });
-
-  it('rejects a codeLines map with a non-positive value', () => {
-    expect(() =>
-      validateAndMergeConfig({ budgets: { codeLines: { '.ts': 0 } } }),
-    ).toThrow(/positive number/);
-  });
-
-  it('rejects a codeLines value that is neither a number nor a map', () => {
-    expect(() =>
-      validateAndMergeConfig({ budgets: { codeLines: 'lots' } }),
-    ).toThrow(/positive number or a map/);
+  it('validates numbers and string arrays', () => {
+    expect(() => validateAndMergeConfig({ docs: { maxCount: -1 } })).toThrow(/positive/);
+    expect(() => validateAndMergeConfig({ archiveDirs: 'docs' })).toThrow(/array/);
+    expect(() => validateAndMergeConfig({ code: { testFilePatterns: [2] } })).toThrow(
+      /array of non-empty strings/,
+    );
   });
 });

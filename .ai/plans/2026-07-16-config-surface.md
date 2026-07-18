@@ -132,7 +132,7 @@ writes resolved arrays (ratified).
 | ---- | ------ |
 | 1. `docs`/`code` groups replace flat budgets | RATIFIED |
 | 2. tiers replace storyDirs/storyLines | RATIFIED as concept |
-| 3+4 unified selector grammar (`matches` + tiers) | **OPEN — the rev 4 shape above** |
+| 3+4 unified selector grammar (`matches` + tiers) | RATIFIED (Ian, 2026-07-17, after scss-600 triple-check) |
 | 4b. testFilePatterns; pragma ban closes over tests | RATIFIED |
 | 5. bannedPragmas, bare substring, JSON-data escape | RATIFIED |
 | 6. one dir rule (bare=any depth, slash=root, `/`-anchor) | RATIFIED |
@@ -171,9 +171,12 @@ repo-wide in every mode; zero runtime dependencies; walker mechanics.
 - Pragma test fixtures move inline→files under
   `packages/brickwall/test/fixtures` (already ignored); defaults
   extract to a JSON data file.
-- README/USAGE rewrite; `--json` types `eslint-disable`→`banned-pragma`
-  AND `md-count`→`doc-count` (docs may be non-md now; messages say
-  "doc files"); ~97 tests touched mechanically. No external consumers.
+- README/USAGE rewrite showcasing AT LEAST THREE example configs (Ian,
+  2026-07-17): defaults-only, dir-centric docs, and the portfolio-style
+  multiband (scss 600 tier over ts 250 default); `--json` types
+  `eslint-disable`→`banned-pragma` AND `md-count`→`doc-count` (docs may
+  be non-md now; messages say "doc files"); ~97 tests touched
+  mechanically. No external consumers.
 - Portfolio config under rev 4:
   `code.matches: [{ "patterns": [".ts", ".tsx", ".js", ".jsx",
   ".scss"] }]` + one scss tier — same constraints, fewer concepts.

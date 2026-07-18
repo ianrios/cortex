@@ -1,9 +1,13 @@
 Current focus:
 
-- Config-surface redesign (.ai/plans/2026-07-16-config-surface.md,
-  rev 3): items 1-2, 4b-8 RATIFIED by Ian 2026-07-17 (ADRs 0001/0002);
-  the unified symmetric docs/code tier shape is the ONE open item — no
-  implementation before his yes on it.
+- Config surface rev 4: FULLY RATIFIED (Ian, 2026-07-17; ADRs
+  0001-0003) and IMPLEMENTED — selector grammar, diff-default CLI,
+  bannedPragmas, 72 tests. Six-angle code review ran pre-commit; all
+  confirmed findings fixed (record in the commit). NEXT: dogfood
+  migrations (petal, portfolio) with fresh tarballs, then drive repos.
+- Deferred perf items (do with benchmark evidence): precompile selector
+  normalization out of per-file hot loops; merge diff mode's duplicate
+  ls-files spawn; audit-shield handling as effective-config.
 - Scale MEASURED 2026-07-17 (NDA repos, recorded generically): 31k-file
   non-git monolith full run 4.1s; 2k-file git repo 0.9s. Rust question
   closed by numbers. Dogfood queue: .ai/specs/dogfood-queue.md (public

@@ -42,5 +42,7 @@ jobs:
         with:
           node-version: 20
 
+      # --full explicitly: bare `brickwall` is diff mode, vacuous in CI
+      # (ADR 0001).
       - name: Self-check on the engines floor (node 20)
-        run: node --version && node packages/brickwall/dist/cli.js
+        run: node --version && node packages/brickwall/dist/cli.js --full

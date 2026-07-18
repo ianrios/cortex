@@ -1,75 +1,92 @@
 # Using brickwall
 
 brickwall is a standalone static check — like a linter, it owns nothing
-about your build. You run it wherever you already run checks. It never
-touches the network, reads only your working tree, and exits 0/1/2
-(pass / budgets exceeded / config-or-usage error).
+about your build. It never touches the network, reads only your working
+tree, and exits 0/1/2 (pass / budgets exceeded / config-or-usage error).
 
-## Standalone (the normal case)
+## Modes
 
-```bash
-npx brickwall            # human output (verdict, then ⚠ warnings)
-npx brickwall --json     # stable machine output: { violations, warnings }
-npx brickwall --all      # full-scope audit — NOT a CI gate (see below)
-npx brickwall --config path/to/brickwall.config.json
-```
+- `npx brickwall` — **diff mode, the default**. Built for the agent
+  loop and big repos: a 30k-file repo checks a 3-file change in the
+  time it takes to read 3 files.
+- `npx brickwall --full` — **the mode for CI and git hooks** (why: the
+  package README and ADR 0001).
+- `npx brickwall --audit` — the superadmin view: what is the normal
+  run shielding? Never wire it into CI.
 
-Zero config works: defaults are the numbers proven in the source repos
-(25 active markdown files, 80 lines per doc, 280 for story/spec dirs, 250
-per code file). Add `brickwall.config.json` (or a `"brickwall"` key in
-package.json — not both) to override. See the package README for the full
-schema.
+Exact mode semantics live in the package README — one home, no drift.
 
 ## Where it runs (all optional — bring your own setup)
 
-brickwall does not replace your typecheck, tests, or ESLint. It slots in
-at any or all of three points:
+1. **Inside the agent loop** — the placement that makes it different
+   from a linter. A Claude Code hook (PostToolUse or Stop) running
+   `npx brickwall` gives an agent that just wrote a 400-line doc the
+   violation as same-session feedback. Diff mode makes this fast
+   anywhere; `--json` and stable exit codes make it machine-readable.
+2. **Pre-commit/pre-push** — `npx brickwall --full`.
+3. **CI** — one step after checkout: `- run: npx brickwall --full`.
 
-1. **Locally / pre-commit** — husky or lint-staged:
-   `"pre-commit": "npx brickwall"`. Catches budget creep before it lands.
-2. **CI** — one step in your existing workflow:
-   `- run: npx brickwall` after checkout. This is the classic CI gate.
-3. **Inside the agent loop** — the placement that makes it different from
-   a normal linter. Example: a Claude Code hook (PostToolUse or Stop) that
-   runs `npx brickwall` so an agent that just wrote a 400-line doc gets
-   the violation as feedback in the same session, instead of a human
-   discovering it at review time. Any agent CLI with hooks/gates can do
-   the same; that is why the CLI has a `--json` mode and stable exit
-   codes.
+## Example configs (three real shapes)
 
-This repo's own `pnpm check` chains typecheck → tests → brickwall because
-cortex is a code repo that also dogfoods its own limiter. Consumers are
-NOT expected to adopt that chain — compose your own.
+**1. Zero config** — the proven defaults (the numbers live in the
+package README's schema block, one home):
+
+```json
+{}
+```
+
+**2. Multiband by file type** (a portfolio SPA: scss carve-out at 600,
+everything else 250):
+
+```jsonc
+{
+  "code": {
+    "matches": [{ "patterns": [".ts", ".tsx", ".js", ".jsx", ".scss"] }],
+    "maxLines": 250,
+    "tiers": [{ "patterns": [".scss"], "maxLines": 600 }]
+  },
+  "docs": { "tiers": [{ "dirs": [".ai/plans", ".ai/specs"], "maxLines": 280 }] },
+  "exemptFiles": ["src/data.ts"]   // visible debt: warns on every run
+}
+```
+
+**3. Dir-centric docs** (everything under `docs/` is documentation —
+any extension; html elsewhere stays code): a `dirs` claim beats the
+patterns-only code claim, so `docs/example.ts` is budgeted as a doc:
+
+```jsonc
+{
+  "docs": {
+    "matches": [{ "dirs": ["/docs"] }, { "patterns": [".md"] }],
+    "maxLines": 120,
+    "tiers": []
+  },
+  "code": { "matches": [{ "patterns": [".ts", ".js", ".html"] }] }
+}
+```
 
 ## The lifecycle, not just the limits
 
-The numbers only work with the archival flow they were designed around:
-
-- Finished plans/specs move (`git mv`) into an archive dir
-  (`archiveDirs`: `.ai/completed/`, `docs/archive/`) — they leave the
-  budget by moving through a lifecycle, never via an inline ignore
-  comment.
-- Epics fold completed phases to a single line pointing at the archive.
+- Finished plans/specs `git mv` into an archive dir (`archiveDirs`) —
+  content leaves the budget through a lifecycle, never via an inline
+  ignore comment. Epics fold completed phases to one line.
 - One fact lives in one file; docs state non-obvious constraints only.
-- Per-file exemptions (`exemptFiles`) are allowed everywhere but custom
-  entries print a warning — visible exemption debt, never an exit-code
-  change. A stale entry (matching nothing) warns too: remove it.
-- `--all` is the superadmin audit: an fs walk skipping only
-  `node_modules` and `.git`, with `ignoreDirs`, `archiveDirs`, and
-  `exemptFiles` disabled. Gitignored files, build output, and test
-  fixtures WILL show up — that is the point. Use it to review what the
-  normal run is shielding; do not wire it into CI.
+- `exemptFiles` pass size/count checks but custom entries WARN
+  (`exemption-debt`; stale entries warn `stale-exemption` — delete
+  them). A tier matching nothing warns `stale-tier`. Warnings never
+  change the exit code; they are the visible-debt channel.
+- Nothing escapes the pragma scan except `archiveDirs` — not tests,
+  not `exemptFiles`. Pragma-bearing test DATA belongs in fixture files
+  under a visibly-ignored dir (this repo: `packages/brickwall/test/
+  fixtures`); pragma VALUES your code must name belong in data files
+  (this repo keeps defaults in `banned-pragmas.json`).
 
 ## For agents installing this for a human
 
-Machine-readable onboarding is a design goal. Current install path:
-
-1. `npm i -D @ianrios/brickwall` (once published; today: `pnpm pack` from
-   this monorepo and install the tarball).
-2. Create `brickwall.config.json` only if the defaults need overriding;
-   prefer defaults.
-3. Wire ONE integration point from the list above — ask the human which;
-   do not modify their existing scripts without asking.
-4. Run `npx brickwall`; if the repo fails immediately, propose an archival
-   structure (`docs/archive/`, `.ai/completed/`) rather than raising
-   budgets.
+1. `npm i -D @ianrios/brickwall` (once published; today: `pnpm pack`
+   from this monorepo and install the tarball).
+2. Honor `.nvmrc`/`engines` before installing anything.
+3. Prefer zero config; override only what the repo's reality demands,
+   and never raise budgets silently — propose archival structure first.
+4. Wire ONE integration point from the list above — ask the human
+   which; remember `--full` for hooks/CI, bare diff mode for the loop.
