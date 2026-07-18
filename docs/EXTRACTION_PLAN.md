@@ -107,15 +107,12 @@ brickwall) into `packages/brickwall`:
 Deliberately first: highest-conviction idea, most generic, independently
 shareable even if nothing else ships.
 
-### Phase 2 — Drift-check harness
+### Phase 2 — Drift-check harness ✅ DONE (2026-07-17)
 
-Extract the registry/runner pattern (registry keys are the violation-type
-union; pure checks take parsed data, return message arrays; IO lives in the
-shell). Not a lift-and-shift: the union trick works inside one compilation
-unit, so built-in types vs userland check keys vs `--json` schema need real
-API design (namespacing, collisions). Portfolio's 13 token checks stay in
-the portfolio as the first userland consumer — that migration proves the
-plugin API is real.
+`@ianrios/drift` extracted (runChecks/formatChecks: key-union typing,
+per-check error isolation, exit 0/1/2 — ADR 0004); portfolio's 13 checks
+migrated as the first userland consumer, all verdict paths verified live.
+Record: `.ai/completed/2026-07-17-phase-2-drift.md`.
 
 ### Phase 3 — Repo baseline + scaffolder
 

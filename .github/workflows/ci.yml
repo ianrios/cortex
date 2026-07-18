@@ -43,6 +43,9 @@ jobs:
           node-version: 20
 
       # --full explicitly: bare `brickwall` is diff mode, vacuous in CI
-      # (ADR 0001).
+      # (ADR 0001). drift has no bin, so its floor proof is an import.
       - name: Self-check on the engines floor (node 20)
-        run: node --version && node packages/brickwall/dist/cli.js --full
+        run: |
+          node --version
+          node packages/brickwall/dist/cli.js --full
+          node --input-type=module -e "const m = await import('./packages/drift/dist/index.js'); if (typeof m.runChecks !== 'function') process.exit(1); console.log('drift floor OK');"

@@ -1,11 +1,11 @@
 Current focus:
 
-- Config surface rev 4: FULLY RATIFIED (Ian, 2026-07-17; ADRs
-  0001-0003) and IMPLEMENTED — selector grammar, diff-default CLI,
-  bannedPragmas, 72 tests. Six-angle code review ran pre-commit; all
-  confirmed findings fixed (record in the commit). Dogfood repos
-  migrated to rev 4 (petal 4956a28, portfolio 2b3c1de — LOCAL commits,
-  push is Ian's call). NEXT: drive-repo dogfooding.
+- PHASE 2 DONE (2026-07-17): @ianrios/drift extracted, portfolio's
+  validate.ts migrated as first userland consumer (221911f), all
+  verdict paths verified live. ADR 0004. Plans archived to completed/.
+- Rev 4 config surface DONE + dogfooded: petal 4956a28, portfolio
+  2b3c1de, both PUSHED (Ian approved). NEXT: drive-repo dogfooding
+  (queue in .ai/specs/dogfood-queue.md), Phase 3 when Ian steers.
 - Deferred perf items (do with benchmark evidence): precompile selector
   normalization out of per-file hot loops; merge diff mode's duplicate
   ls-files spawn; audit-shield handling as effective-config.
